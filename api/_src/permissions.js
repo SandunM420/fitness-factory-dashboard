@@ -4,10 +4,10 @@
 // web/src/pages/registry.jsx must use the same ids, but the server never trusts
 // the browser: every data route checks the caller's role against this list.
 //
-// The role -> pages matrix is stored in the local store (role_permissions) so it
+// The role -> pages matrix is stored in the app database (role_permissions) so it
 // survives restarts and can be edited from the Users page. A role with no saved
 // row gets the DEFAULTS below, so access control never silently falls open.
-import { store, now } from './store.js';
+import { all, run, now } from './store.js';
 
 /** Every page a role can be granted. `group` only affects how the matrix is drawn. */
 export const PAGES = [
@@ -39,7 +39,7 @@ const clean = (pages) => PAGE_IDS.filter((id) => Array.isArray(pages) && pages.i
 /** The whole matrix, as { admin: [...], manager: [...], viewer: [...] }. A local read, so no cache. */
 export async function getMatrix() {
   const matrix = { ...DEFAULTS };
-  for (const row of store.prepare('SELECT role, pages FROM role_permissions').all()) {
+  for (const row of await all('SELECT role, pages FROM role_permissions')) {
     if (EDITABLE_ROLES.includes(row.role)) matrix[row.role] = clean(JSON.parse(row.pages));
   }
   return matrix;
@@ -48,10 +48,10 @@ export async function getMatrix() {
 export async function saveRole(role, pages) {
   if (!EDITABLE_ROLES.includes(role)) throw new Error(`Cannot edit the ${role} role`);
   const next = clean(pages);
-  store.prepare(`
+  await run(`
     INSERT INTO role_permissions (role, pages, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT (role) DO UPDATE SET pages = excluded.pages, updated_at = excluded.updated_at`)
-    .run(role, JSON.stringify(next), now());
+    ON CONFLICT (role) DO UPDATE SET pages = excluded.pages, updated_at = excluded.updated_at`,
+    role, JSON.stringify(next), now());
   return next;
 }
 

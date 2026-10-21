@@ -75,7 +75,7 @@ flowchart LR
 ```
 
 The main design rule: **the browser never sends SQL.** Every query lives on the server in
-[`api/src/metrics.js`](api/src/metrics.js). The frontend asks for a metric by `id` and passes only
+[`api/_src/metrics.js`](api/_src/metrics.js). The frontend asks for a metric by `id` and passes only
 validated parameters (year, date, shop, …), which are bound as typed SQL parameters.
 
 ---
@@ -133,7 +133,7 @@ Requests are limited to 120 per minute per IP.
 | `/schema` | Tables and columns, used by the Data explorer (blocked tables left out) |
 | `/tables/:schema/:table/rows?page=1&pageSize=100` | Paged rows of a table → `{ rows, total, page, pageSize, hiddenColumns }`. `pageSize` is at most 1000. Binary columns (e.g. `Stock.pics`) are left out |
 
-### Metrics registry ([`api/src/metrics.js`](api/src/metrics.js))
+### Metrics registry ([`api/_src/metrics.js`](api/_src/metrics.js))
 
 | id | Shown as | Params | Returns |
 |---|---|---|---|
@@ -145,7 +145,7 @@ Requests are limited to 120 per minute per IP.
 | `category-products` | *hidden* (used by the category pop-up) | `year`, `month`, `category` | every product in a category: qty, revenue, invoices, last sold, cost per unit |
 | `daily-sales-lines` | *hidden* (used by the Today's sales page) | `date`, `shop` | every invoice line for one day, with the corrected sale time |
 
-### Query parameters (`PARAMS` in [`api/src/routes.js`](api/src/routes.js))
+### Query parameters (`PARAMS` in [`api/_src/routes.js`](api/_src/routes.js))
 
 A metric may only accept parameters listed in its `params` array. Each one is validated and bound as a typed SQL input.
 
@@ -164,7 +164,7 @@ A metric may only accept parameters listed in its `params` array. Each one is va
 
 ## Adding a new metric
 
-1. **Add an entry** to the `metrics` array in [`api/src/metrics.js`](api/src/metrics.js):
+1. **Add an entry** to the `metrics` array in [`api/_src/metrics.js`](api/_src/metrics.js):
 
    ```js
    {
@@ -188,7 +188,7 @@ A metric may only accept parameters listed in its `params` array. Each one is va
    },
    ```
 
-2. **If you need a new parameter,** add a validator to `PARAMS` in [`api/src/routes.js`](api/src/routes.js). It should bind typed inputs with `request.input(...)`, and return an error message string if the value is invalid.
+2. **If you need a new parameter,** add a validator to `PARAMS` in [`api/_src/routes.js`](api/_src/routes.js). It should bind typed inputs with `request.input(...)`, and return an error message string if the value is invalid.
 
 3. **Display it.** `kpi`, `bar`, `line` and `table` cards appear on the dashboard automatically through `MetricWidget`. For anything custom, create a component and render it for your `type` in [`web/src/App.jsx`](web/src/App.jsx), as `category-leaders` does.
 

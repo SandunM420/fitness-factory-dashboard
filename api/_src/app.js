@@ -1,3 +1,5 @@
+// The Express app, without starting a server. server.js listens on a port for
+// local use; on Vercel, api/index.js hands this app to the serverless runtime.
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -6,13 +8,14 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import routes from './routes.js';
-import { getPool } from './db.js';
 
 const app = express();
-const port = Number(process.env.PORT || 4000);
 const isProd = process.env.NODE_ENV === 'production';
 
 app.disable('x-powered-by');
+// On Vercel every request arrives through its proxy; trust it so the rate
+// limiter keys on the real client address instead of one shared proxy address.
+if (process.env.VERCEL) app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({
   origin: (process.env.CORS_ORIGIN || 'http://localhost:5173').split(','),
@@ -22,9 +25,10 @@ app.use(express.json({ limit: '16kb' }));
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 120 }));
 app.use('/api', routes);
 
-// In production, serve the built React app from the same origin.
+// Self-hosted production (npm start after a build): serve the React app from
+// the same origin. On Vercel the static files are served by Vercel itself.
 const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
-if (existsSync(webDist)) {
+if (!process.env.VERCEL && existsSync(webDist)) {
   app.use(express.static(webDist));
   app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
 }
@@ -35,15 +39,4 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: isProd ? 'Internal server error' : err.message });
 });
 
-// Last-resort net: a rejected promise from a dropped database connection should
-// be logged, not fatal. Without this Node exits and the whole app goes down.
-process.on('unhandledRejection', (reason) => console.error('Unhandled rejection:', reason?.message ?? reason));
-
-app.listen(port, () => {
-  console.log(`API listening on http://localhost:${port}`);
-  // Open the database connection now rather than making the first visitor wait
-  // for it. The handshake to a host ~280ms away costs several seconds, and the
-  // pool keeps it warm from here on. A failure here is not fatal - requests
-  // retry on their own.
-  getPool().catch((err) => console.error('[db] initial connect failed:', err.message));
-});
+export default app;

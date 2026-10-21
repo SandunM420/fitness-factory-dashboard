@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { pagesForRole } from './permissions.js';
-import { store, now } from './store.js';
+import { get, run, now } from './store.js';
 import { hashPassword, verifyPassword } from './passwords.js';
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -35,16 +35,16 @@ function readCookies(req) {
   return cookies;
 }
 
-function startSession(res, userId) {
+async function startSession(res, userId) {
   const token = randomBytes(32).toString('base64url');
-  store.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
-    .run(tokenHash(token), userId, Date.now() + SESSION_MS);
+  await run('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)',
+    tokenHash(token), userId, Date.now() + SESSION_MS);
   res.cookie(sessionCookie, token, { ...cookieOptions, maxAge: SESSION_MS });
 }
 
 /** Sign a user out everywhere, e.g. after a password change or suspension. */
-export function endSessions(userId) {
-  store.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+export async function endSessions(userId) {
+  await run('DELETE FROM sessions WHERE user_id = ?', userId);
 }
 
 export async function login(req, res) {
@@ -52,20 +52,20 @@ export async function login(req, res) {
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
 
-  const user = store.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  const user = await get('SELECT * FROM users WHERE email = ?', email);
   const valid = await verifyPassword(password, user?.password_hash ?? dummyHash);
   if (!user || !valid) return res.status(401).json({ error: 'Invalid email or password' });
   if (user.suspended) return res.status(403).json({ error: 'This account is suspended' });
 
-  store.prepare('UPDATE users SET last_sign_in_at = ? WHERE id = ?').run(now(), user.id);
-  store.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
-  startSession(res, user.id);
+  await run('UPDATE users SET last_sign_in_at = ? WHERE id = ?', now(), user.id);
+  await run('DELETE FROM sessions WHERE expires_at < ?', Date.now());
+  await startSession(res, user.id);
   return res.json({ user: await publicUser(user) });
 }
 
 export async function logout(req, res) {
   const token = readCookies(req)[sessionCookie];
-  if (token) store.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash(token));
+  if (token) await run('DELETE FROM sessions WHERE token_hash = ?', tokenHash(token));
   res.clearCookie(sessionCookie, cookieOptions);
   return res.status(204).end();
 }
@@ -74,21 +74,21 @@ export async function updatePassword(req, res) {
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (password.length < 12) return res.status(400).json({ error: 'Use a password with at least 12 characters' });
 
-  store.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?')
-    .run(await hashPassword(password), req.user.id);
+  await run('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?',
+    await hashPassword(password), req.user.id);
   // Any other signed-in browser keeps the old credentials' session; drop them all
   // and give this browser a fresh one.
-  endSessions(req.user.id);
-  startSession(res, req.user.id);
+  await endSessions(req.user.id);
+  await startSession(res, req.user.id);
   return res.status(204).end();
 }
 
 export async function requireAuth(req, res, next) {
   try {
     const token = readCookies(req)[sessionCookie];
-    const user = token && store.prepare(`
+    const user = token && await get(`
       SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
-      WHERE s.token_hash = ? AND s.expires_at > ? AND u.suspended = 0`).get(tokenHash(token), Date.now());
+      WHERE s.token_hash = ? AND s.expires_at > ? AND u.suspended = 0`, tokenHash(token), Date.now());
     if (user) {
       req.user = user;
       return next();

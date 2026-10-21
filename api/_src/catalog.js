@@ -1,11 +1,11 @@
 // Website stock: flavours and per-location variant quantities.
 //
 // The POS (SQL Server) is read-only and has no concept of flavours, so the
-// quantities here live in the local store and are the manager's manual split
+// quantities here live in the app database and are the manager's manual split
 // of the POS per-location total. Nothing in this file ever writes to SQL Server.
 import { Router } from 'express';
 import { getPool, sql } from './db.js';
-import { store, toRow, now } from './store.js';
+import { all, get, run, toRow, now } from './store.js';
 
 const router = Router();
 
@@ -23,21 +23,21 @@ function friendly(error) {
 }
 
 /** Run a write; on a constraint failure answer 400 with a readable message instead of a 500. */
-function attempt(res, fn) {
+async function attempt(res, fn) {
   try {
-    return fn();
+    return await fn();
   } catch (error) {
     res.status(400).json({ error: friendly(error) });
     return undefined;
   }
 }
 
-const flavourById = (id) => toRow(store.prepare('SELECT * FROM flavours WHERE id = ?').get(id));
+const flavourById = async (id) => toRow(await get('SELECT * FROM flavours WHERE id = ?', id));
 
 /* ------------------------------------------------------------------ flavours */
 
 router.get('/flavours', wrap(async (_req, res) => {
-  const flavours = store.prepare('SELECT * FROM flavours ORDER BY sort_order, name').all().map(toRow);
+  const flavours = (await all('SELECT * FROM flavours ORDER BY sort_order, name')).map(toRow);
   return res.json({ flavours });
 }));
 
@@ -47,14 +47,14 @@ router.post('/flavours', wrap(async (req, res) => {
   if (!name) return res.status(400).json({ error: 'Enter a flavour name' });
   if (!/^[A-Z0-9]{1,10}$/.test(code)) return res.status(400).json({ error: 'Code must be 1-10 letters or numbers' });
 
-  const result = attempt(res, () => store.prepare('INSERT INTO flavours (name, code, sort_order) VALUES (?, ?, ?)')
-    .run(name, code, Number(req.body?.sort_order) || 0));
+  const result = await attempt(res, () => run('INSERT INTO flavours (name, code, sort_order) VALUES (?, ?, ?)',
+    name, code, Number(req.body?.sort_order) || 0));
   if (!result) return;
-  return res.status(201).json({ flavour: flavourById(result.lastInsertRowid) });
+  return res.status(201).json({ flavour: await flavourById(result.lastInsertRowid) });
 }));
 
 router.patch('/flavours/:id', wrap(async (req, res) => {
-  const current = flavourById(req.params.id);
+  const current = await flavourById(req.params.id);
   if (!current) return res.status(404).json({ error: 'Flavour not found' });
 
   const patch = {};
@@ -74,18 +74,18 @@ router.patch('/flavours/:id', wrap(async (req, res) => {
 
   // Column names come from the fixed keys above, never from the request.
   const columns = Object.keys(patch);
-  const result = attempt(res, () => store.prepare(`UPDATE flavours SET ${columns.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`)
-    .run(...columns.map((c) => patch[c]), req.params.id));
+  const result = await attempt(res, () => run(`UPDATE flavours SET ${columns.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+    ...columns.map((c) => patch[c]), req.params.id));
   if (!result) return;
-  return res.json({ flavour: flavourById(req.params.id) });
+  return res.json({ flavour: await flavourById(req.params.id) });
 }));
 
 // A flavour in use cannot be deleted - the foreign key refuses it, and that is
 // deliberate: deleting one would orphan every sub-product built on it. We count
 // the users first so the refusal says WHY and what to do instead.
 router.delete('/flavours/:id', wrap(async (req, res) => {
-  const flavour = flavourById(req.params.id);
-  const { count } = store.prepare('SELECT COUNT(*) AS count FROM product_variants WHERE flavour_id = ?').get(req.params.id);
+  const flavour = await flavourById(req.params.id);
+  const { count } = await get('SELECT COUNT(*) AS count FROM product_variants WHERE flavour_id = ?', req.params.id);
 
   if (count > 0) {
     const name = flavour?.name ?? 'That flavour';
@@ -95,7 +95,7 @@ router.delete('/flavours/:id', wrap(async (req, res) => {
     });
   }
 
-  if (!attempt(res, () => store.prepare('DELETE FROM flavours WHERE id = ?').run(req.params.id))) return;
+  if (!(await attempt(res, () => run('DELETE FROM flavours WHERE id = ?', req.params.id)))) return;
   return res.status(204).end();
 }));
 
@@ -142,9 +142,12 @@ const PRODUCTS_SQL = `
  * `unassigned` is POS minus assigned - the number that drives the warning.
  */
 router.get('/products', wrap(async (req, res) => {
-  const posRows = (await (await getPool()).request().query(PRODUCTS_SQL)).recordset;
-  const variants = store.prepare('SELECT * FROM product_variants').all().map(toRow);
-  const flavours = store.prepare('SELECT * FROM flavours').all().map(toRow);
+  // The POS and the app database are independent, so ask both at once.
+  const [posRows, variants, flavours] = await Promise.all([
+    getPool().then((pool) => pool.request().query(PRODUCTS_SQL)).then((r) => r.recordset),
+    all('SELECT * FROM product_variants').then((rows) => rows.map(toRow)),
+    all('SELECT * FROM flavours').then((rows) => rows.map(toRow)),
+  ]);
 
   const flavourMap = new Map(flavours.map((f) => [f.id, f]));
   const byItem = new Map();
@@ -222,9 +225,9 @@ async function capacity(item_code, location, exceptFlavourId) {
     .query(`SELECT ISNULL([${location}], 0) AS qty FROM dbo.Stock WHERE RTRIM(itcode) = @code`);
   const pos = Number(result.recordset[0]?.qty ?? 0);
 
-  const { assigned } = store.prepare(`
+  const { assigned } = await get(`
     SELECT COALESCE(SUM(qty), 0) AS assigned FROM product_variants
-    WHERE item_code = ? AND location = ? AND flavour_id IS NOT ?`).get(item_code, location, exceptFlavourId);
+    WHERE item_code = ? AND location = ? AND flavour_id IS NOT ?`, item_code, location, exceptFlavourId);
 
   return { pos, assigned, free: pos - assigned };
 }
@@ -237,9 +240,10 @@ function priceValue(raw) {
   return price;
 }
 
-const variantByKey = ({ item_code, flavour_id, location }) => toRow(store.prepare(
+const variantByKey = async ({ item_code, flavour_id, location }) => toRow(await get(
   'SELECT * FROM product_variants WHERE item_code = ? AND flavour_id = ? AND location = ?',
-).get(item_code, flavour_id, location));
+  item_code, flavour_id, location,
+));
 
 router.post('/variants', wrap(async (req, res) => {
   const item_code = String(req.body?.item_code ?? '').trim();
@@ -263,15 +267,15 @@ router.post('/variants', wrap(async (req, res) => {
     });
   }
 
-  if (variantByKey({ item_code, flavour_id, location })) {
+  if (await variantByKey({ item_code, flavour_id, location })) {
     return res.status(400).json({ error: 'That flavour already exists for this product and location' });
   }
   const visible = req.body?.visible_on_web === undefined ? true : Boolean(req.body.visible_on_web);
-  const result = attempt(res, () => store.prepare(`
+  const result = await attempt(res, () => run(`
     INSERT INTO product_variants (item_code, flavour_id, location, qty, price, visible_on_web)
-    VALUES (?, ?, ?, ?, ?, ?)`).run(item_code, flavour_id, location, qty, price, visible ? 1 : 0));
+    VALUES (?, ?, ?, ?, ?, ?)`, item_code, flavour_id, location, qty, price, visible ? 1 : 0));
   if (!result) return;
-  return res.status(201).json({ variant: variantByKey({ item_code, flavour_id, location }) });
+  return res.status(201).json({ variant: await variantByKey({ item_code, flavour_id, location }) });
 }));
 
 // A variant is addressed by its primary key (item_code, flavour_id, location),
@@ -304,7 +308,7 @@ router.patch('/variants', wrap(async (req, res) => {
 
   const key = variantKey(req, res);
   if (!key) return;
-  if (!variantByKey(key)) return res.status(404).json({ error: 'Not found' });
+  if (!(await variantByKey(key))) return res.status(404).json({ error: 'Not found' });
 
   if (patch.qty !== undefined) {
     const room = await capacity(key.item_code, key.location, key.flavour_id);
@@ -319,20 +323,21 @@ router.patch('/variants', wrap(async (req, res) => {
 
   // Column names come from the fixed keys above, never from the request.
   const columns = Object.keys(patch);
-  const result = attempt(res, () => store.prepare(`
+  const result = await attempt(res, () => run(`
     UPDATE product_variants SET ${columns.map((c) => `${c} = ?`).join(', ')}
-    WHERE item_code = ? AND flavour_id = ? AND location = ?`)
-    .run(...columns.map((c) => patch[c]), key.item_code, key.flavour_id, key.location));
+    WHERE item_code = ? AND flavour_id = ? AND location = ?`,
+    ...columns.map((c) => patch[c]), key.item_code, key.flavour_id, key.location));
   if (!result) return;
-  return res.json({ variant: variantByKey(key) });
+  return res.json({ variant: await variantByKey(key) });
 }));
 
 router.delete('/variants', wrap(async (req, res) => {
   const key = variantKey(req, res);
   if (!key) return;
-  const result = attempt(res, () => store.prepare(
+  const result = await attempt(res, () => run(
     'DELETE FROM product_variants WHERE item_code = ? AND flavour_id = ? AND location = ?',
-  ).run(key.item_code, key.flavour_id, key.location));
+    key.item_code, key.flavour_id, key.location,
+  ));
   if (!result) return;
   return res.status(204).end();
 }));
