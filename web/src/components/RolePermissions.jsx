@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import useResizableColumns from '../useResizableColumns.js';
+import { Alert, Button, Checkbox, Loader, Paper, Table, Text, Title } from '@mantine/core';
 import { requestJson } from '../api.js';
+import { notify } from '../notify.js';
 
 const roleLabel = (role) => role.replace('_', ' ').replace(/^./, (letter) => letter.toUpperCase());
 
@@ -9,12 +10,10 @@ const roleLabel = (role) => role.replace('_', ' ').replace(/^./, (letter) => let
  * so this grid always matches what the server actually enforces.
  */
 export default function RolePermissions() {
-  const columnsRef = useResizableColumns('role-permissions');
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     requestJson('/admin/permissions')
@@ -22,8 +21,18 @@ export default function RolePermissions() {
       .catch((caught) => setError(caught.message));
   }, []);
 
-  if (error && !data) return <section className="card"><h3>Page access</h3><p className="notice error">{error}</p></section>;
-  if (!data) return <section className="card"><h3>Page access</h3><p className="muted">Loading…</p></section>;
+  const header = (
+    <>
+      <Title order={3} size="h4">Page access</Title>
+      <Text size="sm" c="dimmed" mb="md">
+        Which pages each role can open. Enforced by the API, not just hidden from the menu.
+        Super admins always see everything. Changes apply the next time the user loads the app.
+      </Text>
+    </>
+  );
+
+  if (error) return <Paper component="section">{header}<Alert color="red" variant="light">{error}</Alert></Paper>;
+  if (!data) return <Paper component="section">{header}<Loader size="sm" /></Paper>;
 
   const toggle = (role, pageId) => {
     setDraft((current) => {
@@ -36,72 +45,58 @@ export default function RolePermissions() {
     [...(draft[role] ?? [])].sort().join() !== [...(data.matrix[role] ?? [])].sort().join();
 
   const save = async (role) => {
-    setBusy(role); setError(''); setNotice('');
+    setBusy(role);
     try {
       const body = await requestJson(`/admin/permissions/${role}`, { method: 'PUT', body: { pages: draft[role] ?? [] } });
       setData((current) => ({ ...current, matrix: { ...current.matrix, [role]: body.pages } }));
       setDraft((current) => ({ ...current, [role]: body.pages }));
-      setNotice(`Saved page access for ${roleLabel(role)}.`);
-    } catch (caught) { setError(caught.message); }
+      notify.success(`Saved page access for ${roleLabel(role)}.`);
+    } catch (caught) { notify.error(caught.message); }
     finally { setBusy(''); }
   };
 
   return (
-    <section className="card">
-      <div className="card-header">
-        <div>
-          <h3>Page access</h3>
-          <p className="small muted">
-            Which pages each role can open. Enforced by the API, not just hidden from the menu.
-            Super admins always see everything. Changes apply the next time the user loads the app.
-          </p>
-        </div>
-      </div>
-
-      {error && <p className="notice error" role="alert">{error}</p>}
-      {notice && <p className="notice success" role="status">{notice}</p>}
-
-      <div className="user-table-wrap">
-        <table ref={columnsRef} className="user-table permissions-table">
-          <thead>
-            <tr>
-              <th>Page</th>
-              {data.roles.map((role) => <th key={role}>{roleLabel(role)}</th>)}
-            </tr>
-          </thead>
-          <tbody>
+    <Paper component="section">
+      {header}
+      <Table.ScrollContainer minWidth={560}>
+        <Table verticalSpacing="sm" highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Page</Table.Th>
+              {data.roles.map((role) => <Table.Th key={role} ta="center" w={130}>{roleLabel(role)}</Table.Th>)}
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
             {data.pages.map((page) => (
-              <tr key={page.id}>
-                <td>
-                  <strong>{page.label}</strong>
-                  <span>{page.note ?? page.group}</span>
-                </td>
+              <Table.Tr key={page.id}>
+                <Table.Td>
+                  <Text size="sm" fw={600}>{page.label}</Text>
+                  <Text size="xs" c="dimmed">{page.note ?? page.group}</Text>
+                </Table.Td>
                 {data.roles.map((role) => (
-                  <td key={role} className="permission-cell">
-                    <input
-                      type="checkbox"
+                  <Table.Td key={role}>
+                    <Checkbox mx="auto" w="fit-content"
                       aria-label={`${page.label} for ${roleLabel(role)}`}
                       checked={(draft[role] ?? []).includes(page.id)}
                       disabled={busy === role}
-                      onChange={() => toggle(role, page.id)}
-                    />
-                  </td>
+                      onChange={() => toggle(role, page.id)} />
+                  </Table.Td>
                 ))}
-              </tr>
+              </Table.Tr>
             ))}
-            <tr>
-              <td />
+          </Table.Tbody>
+          <Table.Tfoot>
+            <Table.Tr>
+              <Table.Td />
               {data.roles.map((role) => (
-                <td key={role} className="permission-cell">
-                  <button className="primary-btn" disabled={!changed(role) || busy === role} onClick={() => save(role)}>
-                    {busy === role ? 'Saving…' : 'Save'}
-                  </button>
-                </td>
+                <Table.Td key={role} ta="center">
+                  <Button size="xs" disabled={!changed(role)} loading={busy === role} onClick={() => save(role)}>Save</Button>
+                </Table.Td>
               ))}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+            </Table.Tr>
+          </Table.Tfoot>
+        </Table>
+      </Table.ScrollContainer>
+    </Paper>
   );
 }

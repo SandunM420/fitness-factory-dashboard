@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import useResizableColumns from '../useResizableColumns.js';
+import { Alert, Loader, Paper, Text } from '@mantine/core';
 import { requestJson } from '../api.js';
-import FilterBar from '../components/FilterBar.jsx';
+import FilterBar, { filterFields, matches } from '../components/FilterBar.jsx';
 import SubProductGrid from '../components/SubProductGrid.jsx';
-import { ToastStack, useToasts } from '../components/Toasts.jsx';
-import { applyVariant, removeVariants } from '../catalogState.js';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import DataGrid from '../components/DataGrid.jsx';
+import LineToolbar from '../components/LineToolbar.jsx';
+import { applyVariant, removeVariants } from '../catalogState.js';
+import { Dash, money } from '../format.jsx';
+import { notify } from '../notify.js';
 
-const money = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 });
 const label = (location) => location.replace(/_/g, ' ');
-const dash = <span className="muted">–</span>;
 
 // A sub-product has no surrogate id - its primary key is the three parts together.
 const keyQuery = (variant) => new URLSearchParams({
@@ -18,35 +19,13 @@ const keyQuery = (variant) => new URLSearchParams({
   location: variant.location,
 }).toString();
 
-// One filter per column: text is a substring match, select is exact, number
-// carries its own operator. Same shape as a WHERE clause on the list.
-const matches = (row, column, held) => {
-  if (held === undefined || held === '') return true;
-  const cell = row[column.key];
-  if (column.filter === 'number') {
-    if (held.value === '' || held.value === undefined) return true;
-    const a = Number(cell) || 0;
-    const b = Number(held.value);
-    switch (held.op) {
-      case '!=': return a !== b;
-      case '>': return a > b;
-      case '>=': return a >= b;
-      case '<': return a < b;
-      case '<=': return a <= b;
-      default: return a === b;
-    }
-  }
-  if (column.filter === 'select') return String(cell) === String(held);
-  return String(cell ?? '').toLowerCase().includes(String(held).toLowerCase());
-};
-
 const COLUMNS = [
   { key: 'itemCode', label: 'Code', filter: 'text', primary: true },
-  { key: 'itemName', label: 'Item', filter: 'text', primary: true, format: (v) => <span className="product-name" title={v}>{v}</span> },
+  { key: 'itemName', label: 'Item', filter: 'text', primary: true, format: (v) => <Text span size="sm" fw={500} title={v}>{v}</Text> },
   { key: 'category', label: 'Category', filter: 'select', primary: true },
   { key: 'locationLabel', label: 'Location', filter: 'select', primary: true },
-  { key: 'cost', label: 'Cost', align: 'num', filter: 'number', format: (v) => (v ? money.format(v) : dash) },
-  { key: 'price', label: 'Retail', align: 'num', filter: 'number', format: (v) => (v ? money.format(v) : dash) },
+  { key: 'cost', label: 'Cost', align: 'num', filter: 'number', format: (v) => (v ? money.format(v) : <Dash />) },
+  { key: 'price', label: 'Retail', align: 'num', filter: 'number', format: (v) => (v ? money.format(v) : <Dash />) },
   { key: 'posTotal', label: 'In POS', align: 'num', filter: 'number' },
   { key: 'assignedTotal', label: 'Assigned', align: 'num', filter: 'number' },
   {
@@ -54,17 +33,16 @@ const COLUMNS = [
     label: 'Unassigned',
     align: 'num',
     filter: 'number',
-    format: (v) => (v === 0 ? dash : <span className={v > 0 ? 'gap-under' : 'gap-over'}>{v > 0 ? v : `+${Math.abs(v)}`}</span>),
+    // Orange: stock not yet split into flavours. Red: more assigned than the POS holds.
+    format: (v) => (v === 0 ? <Dash /> : <Text span size="sm" fw={600} c={v > 0 ? 'orange.4' : 'red.4'}>{v > 0 ? v : `+${Math.abs(v)}`}</Text>),
   },
-  { key: 'flavourCount', label: 'Flavours', align: 'num', filter: 'number', format: (v) => (v || dash) },
+  { key: 'flavourCount', label: 'Flavours', align: 'num', filter: 'number', format: (v) => (v || <Dash />) },
 ];
 
 export default function WebsiteStockPage() {
-  const columnsRef = useResizableColumns('website-stock');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { toasts, push, dismiss } = useToasts();
   const [busy, setBusy] = useState('');
   const [open, setOpen] = useState(() => new Set());
   const [filters, setFilters] = useState({});
@@ -117,16 +95,7 @@ export default function WebsiteStockPage() {
     return out;
   }, [data, locations]);
 
-  // Filter fields ARE the columns, so the two can never drift apart.
-  const fields = useMemo(() => COLUMNS.filter((c) => c.filter).map((column) => ({
-    id: column.key,
-    label: column.label,
-    type: column.filter,
-    primary: Boolean(column.primary),
-    options: column.filter !== 'select' ? undefined
-      : [...new Set(baseRows.map((row) => row[column.key]))].filter((v) => v !== '' && v != null).sort()
-          .map((value) => ({ value, label: value })),
-  })), [baseRows]);
+  const fields = useMemo(() => filterFields(COLUMNS, baseRows), [baseRows]);
 
   const rows = useMemo(() => {
     const picked = baseRows.filter((row) =>
@@ -162,9 +131,9 @@ export default function WebsiteStockPage() {
     })
       .then((body) => {
         setData((current) => applyVariant(current, body.variant));
-        push('success', 'Sub-product saved.');
+        notify.success('Sub-product saved.');
       })
-      .catch((caught) => push('error', caught.message))
+      .catch((caught) => notify.error(caught.message))
       .finally(() => setBusy(''));
   };
 
@@ -173,9 +142,9 @@ export default function WebsiteStockPage() {
     return requestJson(`/catalog/variants?${keyQuery(variant)}`, { method: 'PATCH', body })
       .then((result) => {
         setData((current) => applyVariant(current, result.variant));
-        push('success', 'Sub-product saved.');
+        notify.success('Sub-product saved.');
       })
-      .catch((caught) => push('error', caught.message))
+      .catch((caught) => notify.error(caught.message))
       .finally(() => setBusy(''));
   };
 
@@ -196,21 +165,25 @@ export default function WebsiteStockPage() {
 
       const gone = results.filter((r) => r.ok).map((r) => r.key);
       if (gone.length) setData((current) => removeVariants(current, gone));
-      if (gone.length) push('success', gone.length === 1 ? 'Record deleted.' : `${gone.length} records deleted.`);
-      for (const failure of results.filter((r) => !r.ok)) push('error', failure.message);
+      if (gone.length) notify.success(gone.length === 1 ? 'Record deleted.' : `${gone.length} records deleted.`);
+      for (const failure of results.filter((r) => !r.ok)) notify.error(failure.message);
       done?.();
-    } catch (caught) { push('error', caught.message); }
+    } catch (caught) { notify.error(caught.message); }
     finally { setBusy(''); setPendingDelete(null); }
   };
-  if (loading) return <div className="card">Loading…</div>;
-  if (error && !data) return <div className="card error">Could not load products: {error}</div>;
+  const columns = useMemo(() => COLUMNS.map((column) => ({
+    ...column,
+    render: (row) => (column.format ? column.format(row[column.key], row) : row[column.key]),
+  })), []);
+
+  if (loading) return <Loader />;
+  if (error && !data) return <Alert color="red" variant="light" title="Could not load products">{error}</Alert>;
 
   return (
-    <div className="card">
-      <ToastStack toasts={toasts} onDismiss={dismiss} />
+    <Paper>
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="Delete Record"
+        title="Delete record"
         message={pendingDelete?.variants.length > 1
           ? `Please confirm that you wish to delete these ${pendingDelete.variants.length} records.`
           : 'Please confirm that you wish to delete this record.'}
@@ -220,69 +193,29 @@ export default function WebsiteStockPage() {
       />
       <FilterBar fields={fields} applied={filters} onApply={setFilters} />
 
-      <div className="modal-toolbar item-toolbar">
-        <span className="muted small">
-          {rows.length} of {baseRows.length} rows
-        </span>
-        {updatedAt && <span className="muted small">updated {updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>}
-        <button type="button" onClick={load}>Refresh</button>
-      </div>
+      <LineToolbar info={`${rows.length} of ${baseRows.length} rows`} updatedAt={updatedAt} onRefresh={load} />
 
-      <div className="table-scroll">
-        <table ref={columnsRef} className="product-table stock-table">
-          <thead>
-            <tr>
-              <th style={{ width: '2rem' }} />
-              {COLUMNS.map((column) => (
-                <th key={column.key} className={`${column.align === 'num' ? 'num' : ''}${sort.key === column.key ? ' sorted' : ''}`}>
-                  <button className="sort-btn" onClick={() => toggleSort(column.key)}>
-                    {column.label}
-                    <span className="sort-arrow">{sort.key === column.key ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span>
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && <tr><td className="empty" colSpan={COLUMNS.length + 1}>No rows match that filter.</td></tr>}
-            {rows.flatMap((row) => {
-              const expanded = open.has(row.rowKey);
-              const out = [(
-                <tr key={row.rowKey} className={expanded ? 'is-open' : ''}>
-                  <td>
-                    <button className="expand-btn" onClick={() => toggleRow(row.rowKey)}
-                      aria-expanded={expanded} aria-label={expanded ? 'Collapse' : 'Expand'}>
-                      {expanded ? '⌄' : '›'}
-                    </button>
-                  </td>
-                  {COLUMNS.map((column) => (
-                    <td key={column.key} className={column.align === 'num' ? 'num' : ''}>
-                      {column.format ? column.format(row[column.key], row) : row[column.key]}
-                    </td>
-                  ))}
-                </tr>
-              )];
-
-              if (expanded) out.push(
-                <tr key={`${row.rowKey}-sub`} className="sub-row">
-                  <td />
-                  <td colSpan={COLUMNS.length}>
-                    <SubProductGrid
-                      row={row}
-                      flavours={data.flavours}
-                      busy={busy}
-                      onCreate={addVariant}
-                      onUpdate={patchVariant}
-                      onDelete={remove}
-                    />
-                  </td>
-                </tr>
-              );
-              return out;
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <DataGrid
+        storageKey="website-stock"
+        rows={rows}
+        columns={columns}
+        getRowId={(row) => row.rowKey}
+        sort={sort}
+        onSort={toggleSort}
+        expanded={open}
+        onToggleExpand={toggleRow}
+        renderExpanded={(row) => (
+          <SubProductGrid
+            row={row}
+            flavours={data.flavours}
+            busy={busy}
+            onCreate={addVariant}
+            onUpdate={patchVariant}
+            onDelete={remove}
+          />
+        )}
+        emptyText="No rows match that filter."
+      />
+    </Paper>
   );
 }

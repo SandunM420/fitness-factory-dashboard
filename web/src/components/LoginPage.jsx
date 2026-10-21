@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Alert, Button, PasswordInput, Stack, TextInput } from '@mantine/core';
+import AuthCard from './AuthCard.jsx';
 
 export default function LoginPage({ onSignedIn, configurationError }) {
   const [email, setEmail] = useState('');
@@ -28,26 +30,17 @@ export default function LoginPage({ onSignedIn, configurationError }) {
   };
 
   return (
-    <main className="login-page">
-      <section className="login-card" aria-labelledby="login-title">
-        <div className="login-brand"><span className="brand-mark">FF</span><span>Fitness Factory</span></div>
-        <h1 id="login-title">Sign in</h1>
-        <p className="muted">Use the account provided by your administrator.</p>
-        <form onSubmit={submit}>
-          <label>Email address
-            <input type="email" autoComplete="username" value={email}
-              onChange={(event) => setEmail(event.target.value)} required autoFocus />
-          </label>
-          <label>Password
-            <input type="password" autoComplete="current-password" value={password}
-              onChange={(event) => setPassword(event.target.value)} required />
-          </label>
-          {error && <p className="login-error" role="alert">{error}</p>}
-          <button className="login-submit" type="submit" disabled={loading || Boolean(configurationError)}>
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-      </section>
-    </main>
+    <AuthCard title="Sign in" subtitle="Use the account provided by your administrator.">
+      <form onSubmit={submit}>
+        <Stack>
+          <TextInput label="Email address" type="email" autoComplete="username" required autoFocus
+            value={email} onChange={(event) => setEmail(event.currentTarget.value)} />
+          <PasswordInput label="Password" autoComplete="current-password" required
+            value={password} onChange={(event) => setPassword(event.currentTarget.value)} />
+          {error && <Alert color="red" variant="light" role="alert">{error}</Alert>}
+          <Button type="submit" fullWidth loading={loading} disabled={Boolean(configurationError)}>Sign in</Button>
+        </Stack>
+      </form>
+    </AuthCard>
   );
 }

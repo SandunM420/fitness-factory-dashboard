@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Alert, Button, PasswordInput, Stack } from '@mantine/core';
+import AuthCard from './AuthCard.jsx';
 
 export default function PasswordPage({ onComplete }) {
   const [password, setPassword] = useState('');
@@ -22,14 +24,18 @@ export default function PasswordPage({ onComplete }) {
     finally { setLoading(false); }
   };
 
-  return <main className="login-page"><section className="login-card">
-    <div className="login-brand"><span className="brand-mark">FF</span><span>Fitness Factory</span></div>
-    <h1>Choose a password</h1><p className="muted">Use at least 12 characters and avoid passwords used elsewhere.</p>
-    <form onSubmit={submit}>
-      <label>New password<input type="password" autoComplete="new-password" minLength="12" value={password} onChange={(event) => setPassword(event.target.value)} required autoFocus /></label>
-      <label>Confirm password<input type="password" autoComplete="new-password" minLength="12" value={confirm} onChange={(event) => setConfirm(event.target.value)} required /></label>
-      {error && <p className="login-error" role="alert">{error}</p>}
-      <button className="login-submit" disabled={loading}>{loading ? 'Saving…' : 'Save password'}</button>
-    </form>
-  </section></main>;
+  return (
+    <AuthCard title="Choose a password" subtitle="Use at least 12 characters and avoid passwords used elsewhere.">
+      <form onSubmit={submit}>
+        <Stack>
+          <PasswordInput label="New password" autoComplete="new-password" minLength={12} required autoFocus
+            value={password} onChange={(event) => setPassword(event.currentTarget.value)} />
+          <PasswordInput label="Confirm password" autoComplete="new-password" minLength={12} required
+            value={confirm} onChange={(event) => setConfirm(event.currentTarget.value)} />
+          {error && <Alert color="red" variant="light" role="alert">{error}</Alert>}
+          <Button type="submit" fullWidth loading={loading}>Save password</Button>
+        </Stack>
+      </form>
+    </AuthCard>
+  );
 }

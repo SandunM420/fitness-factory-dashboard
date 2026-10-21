@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Center, Loader, Text } from '@mantine/core';
 import AdminLayout from './layout/AdminLayout.jsx';
 import { DEFAULT_PAGE, findPage, firstPageFor, parentOf } from './pages/registry.jsx';
 import LoginPage from './components/LoginPage.jsx';
@@ -48,11 +49,11 @@ export default function App() {
     setAuth({ loading: false, user: null, error: '' });
   };
 
-  if (auth.loading) return <div className="auth-loading">Checking session…</div>;
+  if (auth.loading) return <Center mih="100vh"><Loader /></Center>;
   if (!auth.user) return <LoginPage configurationError={auth.error} onSignedIn={(user) => setAuth({ loading: false, user, error: '' })} />;
   if (needsPassword) return <PasswordPage onComplete={() => setPasswordChanged(true)} />;
   if (!firstPageFor(auth.user)) return (
-    <div className="auth-loading">Your account has no pages enabled yet. Ask an administrator for access.</div>
+    <Center mih="100vh" p="md"><Text c="dimmed">Your account has no pages enabled yet. Ask an administrator for access.</Text></Center>
   );
 
   return (

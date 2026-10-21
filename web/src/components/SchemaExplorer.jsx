@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
+import {
+  Alert, Grid, Group, Loader, NavLink, Pagination, Paper, ScrollArea, Select, Text, TextInput, Title,
+} from '@mantine/core';
+import { IconSearch } from '@tabler/icons-react';
 import { getJson } from '../api.js';
 import DataTable from './DataTable.jsx';
+import { num } from '../format.jsx';
 
-const PAGE_SIZES = [100, 250, 500, 1000];
-const fmt = new Intl.NumberFormat();
+const PAGE_SIZES = ['100', '250', '500', '1000'];
 
 export default function SchemaExplorer() {
   const [tables, setTables] = useState([]);
@@ -44,50 +48,49 @@ export default function SchemaExplorer() {
   const lastRow = data ? Math.min(data.page * data.pageSize, data.total) : 0;
 
   return (
-    <div className="explorer">
-      <aside className="card">
-        <input placeholder="Search tables…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <ul>
-          {visible.map((t) => (
-            <li key={`${t.schema}.${t.table}`}>
-              <button className={selected === t ? 'active' : ''} onClick={() => selectTable(t)}>
-                <span className="muted">{t.schema}.</span>{t.table}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
-      <section className="card explorer-main">
-        {error && <p className="error">{error}</p>}
-        {!selected ? <p className="muted">Select a table to see its records.</p> : (
-          <>
-            <div className="pager">
-              <h3>{selected.schema}.{selected.table}</h3>
-              <span className="muted">
-                {data ? `Rows ${fmt.format(firstRow)}–${fmt.format(lastRow)} of ${fmt.format(data.total)}` : 'Loading…'}
-                {loading && data ? ' · loading…' : ''}
-              </span>
-              <div className="pager-controls">
-                <label className="muted">
-                  Rows per page{' '}
-                  <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
-                    {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                </label>
-                <button disabled={loading || page <= 1} onClick={() => setPage(1)} title="First page">«</button>
-                <button disabled={loading || page <= 1} onClick={() => setPage(page - 1)}>‹ Prev</button>
-                <span>Page {fmt.format(page)} of {fmt.format(totalPages)}</span>
-                <button disabled={loading || page >= totalPages} onClick={() => setPage(page + 1)}>Next ›</button>
-                <button disabled={loading || page >= totalPages} onClick={() => setPage(totalPages)} title="Last page">»</button>
-              </div>
-            </div>
-            {data?.hiddenColumns?.length > 0 && (
-              <p className="muted small">Not shown (binary data): {data.hiddenColumns.join(', ')}</p>
-            )}
-            {data && <DataTable rows={data.rows} />}
-          </>
-        )}
-      </section>
-    </div>
+    <Grid gutter="md">
+      <Grid.Col span={{ base: 12, md: 3 }}>
+        <Paper p="sm">
+          <TextInput placeholder="Search tables…" leftSection={<IconSearch size={16} />} mb="xs"
+            value={filter} onChange={(e) => setFilter(e.currentTarget.value)} />
+          <ScrollArea.Autosize mah="70vh" type="auto">
+            {tables.length === 0 && !error && <Group gap="xs" p="xs"><Loader size="xs" /><Text size="sm" c="dimmed">Loading tables…</Text></Group>}
+            {visible.map((t) => (
+              <NavLink key={`${t.schema}.${t.table}`} active={selected === t} onClick={() => selectTable(t)}
+                style={{ borderRadius: 'var(--mantine-radius-sm)' }} py={6}
+                label={<Text size="sm" truncate><Text span c="dimmed" inherit>{t.schema}.</Text>{t.table}</Text>} />
+            ))}
+          </ScrollArea.Autosize>
+        </Paper>
+      </Grid.Col>
+
+      <Grid.Col span={{ base: 12, md: 9 }}>
+        <Paper style={{ minWidth: 0 }}>
+          {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
+          {!selected ? <Text c="dimmed">Select a table to see its records.</Text> : (
+            <>
+              <Group justify="space-between" mb="sm" gap="sm">
+                <div>
+                  <Title order={3} size="h4">{selected.schema}.{selected.table}</Title>
+                  <Text size="sm" c="dimmed">
+                    {data ? `Rows ${num.format(firstRow)}–${num.format(lastRow)} of ${num.format(data.total)}` : 'Loading…'}
+                    {loading && data ? ' · loading…' : ''}
+                  </Text>
+                </div>
+                <Group gap="sm">
+                  <Select size="xs" w={110} aria-label="Rows per page" data={PAGE_SIZES} value={String(pageSize)} allowDeselect={false}
+                    onChange={(v) => { setPageSize(Number(v)); setPage(1); }} />
+                  <Pagination size="sm" total={totalPages} value={page} onChange={setPage} disabled={loading} withEdges siblings={1} />
+                </Group>
+              </Group>
+              {data?.hiddenColumns?.length > 0 && (
+                <Text size="xs" c="dimmed" mb="xs">Not shown (binary data): {data.hiddenColumns.join(', ')}</Text>
+              )}
+              {data && <DataTable rows={data.rows} />}
+            </>
+          )}
+        </Paper>
+      </Grid.Col>
+    </Grid>
   );
 }

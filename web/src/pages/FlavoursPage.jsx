@@ -1,61 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import useResizableColumns from '../useResizableColumns.js';
+import { Alert, Checkbox, Code, Loader, NumberInput, Paper, TextInput } from '@mantine/core';
 import { requestJson } from '../api.js';
-import FilterBar from '../components/FilterBar.jsx';
+import FilterBar, { filterFields, matches } from '../components/FilterBar.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { ToastStack, useToasts } from '../components/Toasts.jsx';
-
-// One filter per column: text is a substring match, select is exact, number
-// carries its own operator. Same shape as a WHERE clause on the list.
-const matches = (row, column, held) => {
-  if (held === undefined || held === '') return true;
-  const cell = row[column.key];
-  if (column.filter === 'number') {
-    if (held.value === '' || held.value === undefined) return true;
-    const a = Number(cell) || 0;
-    const b = Number(held.value);
-    switch (held.op) {
-      case '!=': return a !== b;
-      case '>': return a > b;
-      case '>=': return a >= b;
-      case '<': return a < b;
-      case '<=': return a <= b;
-      default: return a === b;
-    }
-  }
-  if (column.filter === 'select') return String(cell) === String(held);
-  return String(cell ?? '').toLowerCase().includes(String(held).toLowerCase());
-};
+import DataGrid from '../components/DataGrid.jsx';
+import LineToolbar from '../components/LineToolbar.jsx';
+import { notify } from '../notify.js';
 
 const COLUMNS = [
   { key: 'name', label: 'Flavour', filter: 'text', primary: true, edit: 'text' },
   // No `edit`: sub-product codes are built from this (PRT060-CHOC), so changing
   // it would rename every sub-product using the flavour. Set once, at creation.
-  { key: 'code', label: 'Code', filter: 'text', primary: true, format: (v) => <code>{v}</code> },
+  { key: 'code', label: 'Code', filter: 'text', primary: true, format: (v) => <Code>{v}</Code> },
   // Dropdown order. Not sortable itself - it IS the ordering.
   { key: 'sort_order', label: 'Sort', align: 'num', filter: 'number', edit: 'number', sortable: false },
   {
     key: 'status', label: 'Active', filter: 'select', primary: true, edit: 'boolean',
-    format: (v) => <input type="checkbox" checked={v === 'Yes'} readOnly aria-label={v === 'Yes' ? 'Active' : 'Inactive'} />,
+    format: (v) => <Checkbox size="xs" checked={v === 'Yes'} readOnly aria-label={v === 'Yes' ? 'Active' : 'Inactive'} />,
   },
 ];
 
 const blankLine = { name: '', code: '', sort_order: 0, active: true };
 
 export default function FlavoursPage() {
-  const columnsRef = useResizableColumns('flavours');
   const [flavours, setFlavours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [filters, setFilters] = useState({});
   const [sort, setSort] = useState({ key: 'sort_order', dir: 'asc' });
-  const [selected, setSelected] = useState(() => new Set());
-  const [edits, setEdits] = useState({});      // id -> { name, code, sort_order, active }
+  const [selected, setSelected] = useState(() => new Set());   // row ids as strings
+  const [edits, setEdits] = useState({});      // id -> { name, sort_order, active }
   const [newLine, setNewLine] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
-  const { toasts, push, dismiss } = useToasts();
 
   const load = useCallback(async () => {
     try {
@@ -74,16 +52,7 @@ export default function FlavoursPage() {
     status: flavour.active ? 'Yes' : 'No',
   })), [flavours]);
 
-  // Filter fields ARE the columns, so the two can never drift apart.
-  const fields = useMemo(() => COLUMNS.filter((c) => c.filter).map((column) => ({
-    id: column.key,
-    label: column.label,
-    type: column.filter,
-    primary: Boolean(column.primary),
-    options: column.filter !== 'select' ? undefined
-      : [...new Set(baseRows.map((row) => row[column.key]))].filter((v) => v !== '' && v != null).sort()
-          .map((value) => ({ value, label: value })),
-  })), [baseRows]);
+  const fields = useMemo(() => filterFields(COLUMNS, baseRows), [baseRows]);
 
   const rows = useMemo(() => {
     const picked = baseRows.filter((row) =>
@@ -112,7 +81,7 @@ export default function FlavoursPage() {
   const draftFor = (row) => ({ name: row.name, sort_order: row.sort_order, active: row.active });
   const editSelected = () => setEdits((current) => {
     const next = { ...current };
-    for (const row of baseRows) if (selected.has(row.id) && !next[row.id]) next[row.id] = draftFor(row);
+    for (const row of baseRows) if (selected.has(String(row.id)) && !next[row.id]) next[row.id] = draftFor(row);
     return next;
   });
   const editField = (id, field, value) =>
@@ -134,9 +103,9 @@ export default function FlavoursPage() {
         });
       }
       await load();
-      push('success', 'Changes saved.');
+      notify.success('Changes saved.');
       reset();
-    } catch (caught) { push('error', caught.message); }
+    } catch (caught) { notify.error(caught.message); }
     finally { setBusy(''); }
   };
 
@@ -151,37 +120,53 @@ export default function FlavoursPage() {
 
     const failed = results.filter((r) => !r.ok);
     const removed = results.length - failed.length;
-    if (removed) push('success', removed === 1 ? 'Record deleted.' : `${removed} records deleted.`);
-    for (const failure of failed) push('error', failure.message);
+    if (removed) notify.success(removed === 1 ? 'Record deleted.' : `${removed} records deleted.`);
+    for (const failure of failed) notify.error(failure.message);
 
     await load();
     setSelected(new Set());
     setBusy(''); setPendingDelete(null);
   };
-  if (loading) return <div className="card">Loading…</div>;
-  if (error && flavours.length === 0) return <div className="card error">Could not load flavours: {error}</div>;
 
-  const cell = (row, column) => {
-    const draft = edits[row.id];
-    if (!draft) return column.format ? column.format(row[column.key], row) : row[column.key];
-    switch (column.edit) {
-      case 'text': return <input value={draft[column.key]} style={{ width: column.key === 'code' ? '7rem' : '12rem' }}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => editField(row.id, column.key, column.key === 'code' ? e.target.value.toUpperCase() : e.target.value)} />;
-      case 'number': return <input type="number" value={draft.sort_order} style={{ width: '5rem' }}
-        onClick={(e) => e.stopPropagation()} onChange={(e) => editField(row.id, 'sort_order', e.target.value)} />;
-      case 'boolean': return <input type="checkbox" checked={draft.active}
-        onClick={(e) => e.stopPropagation()} onChange={(e) => editField(row.id, 'active', e.target.checked)} />;
-      default: return column.format ? column.format(row[column.key], row) : row[column.key];
-    }
+  const columns = useMemo(() => COLUMNS.map((column) => ({
+    ...column,
+    render: (row) => {
+      const draft = edits[row.id];
+      const plain = () => (column.format ? column.format(row[column.key], row) : row[column.key]);
+      if (!draft) return plain();
+      switch (column.edit) {
+        case 'text': return <TextInput size="xs" w={200} value={draft.name} aria-label="Flavour name"
+          onChange={(e) => editField(row.id, 'name', e.currentTarget.value)} />;
+        case 'number': return <NumberInput size="xs" w={90} ml="auto" value={draft.sort_order} aria-label="Sort order"
+          onChange={(v) => editField(row.id, 'sort_order', v)} />;
+        case 'boolean': return <Checkbox size="xs" checked={draft.active} aria-label="Active"
+          onChange={(e) => editField(row.id, 'active', e.currentTarget.checked)} />;
+        default: return plain();
+      }
+    },
+  })), [edits]);
+
+  if (loading) return <Loader />;
+  if (error && flavours.length === 0) return <Alert color="red" variant="light" title="Could not load flavours">{error}</Alert>;
+
+  const extraRow = newLine && {
+    control: <Checkbox size="xs" checked readOnly aria-label="New line" />,
+    cells: {
+      name: <TextInput size="xs" w={200} autoFocus placeholder="Flavour name" value={newLine.name} aria-label="Flavour name"
+        onChange={(e) => setNewLine({ ...newLine, name: e.currentTarget.value })} />,
+      code: <TextInput size="xs" w={110} placeholder="CODE" maxLength={10} value={newLine.code} aria-label="Code"
+        onChange={(e) => setNewLine({ ...newLine, code: e.currentTarget.value.toUpperCase() })} />,
+      sort_order: <NumberInput size="xs" w={90} ml="auto" value={newLine.sort_order} aria-label="Sort order"
+        onChange={(v) => setNewLine({ ...newLine, sort_order: v })} />,
+      status: <Checkbox size="xs" checked readOnly aria-label="Active" />,
+    },
   };
 
   return (
-    <div className="card">
-      <ToastStack toasts={toasts} onDismiss={dismiss} />
+    <Paper>
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="Delete Record"
+        title="Delete record"
         message={pendingDelete?.length > 1
           ? `Please confirm that you wish to delete these ${pendingDelete.length} records.`
           : 'Please confirm that you wish to delete this record.'}
@@ -192,88 +177,29 @@ export default function FlavoursPage() {
 
       <FilterBar fields={fields} applied={filters} onApply={setFilters} />
 
-      <div className="line-toolbar">
-        <button type="button" className="icon-btn" title="New line" aria-label="New line"
-          disabled={Boolean(busy) || newLine !== null} onClick={() => setNewLine(blankLine)}>+</button>
-        <button type="button" className="icon-btn" title="Edit selected" aria-label="Edit selected"
-          disabled={Boolean(busy) || selected.size === 0} onClick={editSelected}>✎</button>
-        <button type="button" className="icon-btn danger" title="Delete" aria-label="Delete"
-          disabled={Boolean(busy) || selected.size === 0}
-          onClick={() => setPendingDelete(baseRows.filter((r) => selected.has(r.id)))}>🗑</button>
+      <LineToolbar
+        onNew={() => setNewLine(blankLine)} newDisabled={Boolean(busy) || newLine !== null}
+        onEdit={editSelected} editDisabled={Boolean(busy) || selected.size === 0}
+        onDelete={() => setPendingDelete(baseRows.filter((r) => selected.has(String(r.id))))}
+        deleteDisabled={Boolean(busy) || selected.size === 0}
+        dirty={dirty} saving={busy === 'saving'}
+        saveDisabled={Boolean(busy && busy !== 'saving') || (newLine && (!newLine.name.trim() || !newLine.code.trim()))}
+        onSave={save} onCancel={reset} cancelLabel={newLine ? 'Cancel new' : 'Cancel'}
+        info={`${rows.length} of ${baseRows.length}`} updatedAt={updatedAt} onRefresh={load}
+      />
 
-        {dirty && (
-          <>
-            <button type="button" className="save-btn"
-              disabled={Boolean(busy) || (newLine && (!newLine.name.trim() || !newLine.code.trim()))} onClick={save}>
-              {busy === 'saving' ? 'Saving…' : 'Save'}
-            </button>
-            <button type="button" className="cancel-btn" disabled={Boolean(busy)} onClick={reset}>
-              {newLine ? 'Cancel New' : 'Cancel'}
-            </button>
-          </>
-        )}
-
-        <span className="muted small toolbar-count">{rows.length} of {baseRows.length}</span>
-        {updatedAt && (
-          <span className="muted small">updated {updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-        )}
-        <button type="button" onClick={load}>Refresh</button>
-      </div>
-
-      <div className="table-scroll">
-        <table ref={columnsRef} className="product-table stock-table">
-          <thead>
-            <tr>
-              <th style={{ width: '2.5rem' }} />
-              {COLUMNS.map((column) => (
-                <th key={column.key} className={`${column.align === 'num' ? 'num' : ''}${sort.key === column.key ? ' sorted' : ''}`}>
-                  {column.sortable === false ? column.label : (
-                    <button className="sort-btn" onClick={() => toggleSort(column.key)}>
-                      {column.label}
-                      <span className="sort-arrow">{sort.key === column.key ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span>
-                    </button>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && !newLine && (
-              <tr><td className="empty" colSpan={COLUMNS.length + 1}>(No data)</td></tr>
-            )}
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td onClick={(event) => event.stopPropagation()}>
-                  <input type="checkbox" checked={selected.has(row.id)} onChange={() => toggleSelect(row.id)}
-                    aria-label={`Select ${row.name}`} />
-                </td>
-                {COLUMNS.map((column) => (
-                  <td key={column.key} className={column.align === 'num' ? 'num' : ''}>{cell(row, column)}</td>
-                ))}
-              </tr>
-            ))}
-
-            {newLine && (
-              <tr className="is-new">
-                <td><input type="checkbox" checked readOnly aria-label="New line" /></td>
-                <td>
-                  <input autoFocus placeholder="Flavour name" value={newLine.name} style={{ width: '12rem' }}
-                    onChange={(event) => setNewLine({ ...newLine, name: event.target.value })} />
-                </td>
-                <td>
-                  <input placeholder="CODE" value={newLine.code} maxLength={10} style={{ width: '7rem' }}
-                    onChange={(event) => setNewLine({ ...newLine, code: event.target.value.toUpperCase() })} />
-                </td>
-                <td className="num">
-                  <input type="number" value={newLine.sort_order} style={{ width: '5rem' }}
-                    onChange={(event) => setNewLine({ ...newLine, sort_order: event.target.value })} />
-                </td>
-                <td><input type="checkbox" checked readOnly aria-label="Active" /></td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <DataGrid
+        storageKey="flavours"
+        rows={rows}
+        columns={columns}
+        getRowId={(row) => row.id}
+        sort={sort}
+        onSort={toggleSort}
+        selected={selected}
+        onToggleSelect={toggleSelect}
+        extraRow={extraRow}
+        emptyText="(No data)"
+      />
+    </Paper>
   );
 }

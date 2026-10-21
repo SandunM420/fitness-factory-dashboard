@@ -1,5 +1,15 @@
 import { useMemo, useState } from 'react';
-import useResizableColumns from '../useResizableColumns.js';
+import { Button, Group, Paper, Select, Text, TextInput } from '@mantine/core';
+import { IconRefresh, IconSearch } from '@tabler/icons-react';
+import DataGrid from './DataGrid.jsx';
+import { shortTime } from '../format.jsx';
+
+const STOCK_OPTIONS = [
+  { value: 'all', label: 'Any stock' },
+  { value: 'in', label: 'In stock' },
+  { value: 'out', label: 'Out of stock' },
+  { value: 'low', label: 'Low (1-5)' },
+];
 
 /**
  * Searchable, sortable table for the item master pages.
@@ -7,7 +17,6 @@ import useResizableColumns from '../useResizableColumns.js';
  * that gets summed in the footer row.
  */
 export default function ItemTable({ rows, columns, searchKeys, filterKey, filterLabel, stockKey, initialSort, toolbarExtra, onRefresh, updatedAt, emptyText = 'Nothing to show.' }) {
-  const columnsRef = useResizableColumns('item-table-v2-' + columns.map((c) => c.key).join('-'), String(columns.length));
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [stock, setStock] = useState('all');   // only shown when stockKey is given
@@ -42,87 +51,56 @@ export default function ItemTable({ rows, columns, searchKeys, filterKey, filter
     });
   }, [rows, columns, search, filter, filterKey, stock, stockKey, searchKeys, sort]);
 
-  const totals = useMemo(() => {
-    const out = {};
-    for (const c of columns) if (c.total) out[c.key] = shown.reduce((a, r) => a + (r[c.key] ?? 0), 0);
-    return out;
-  }, [shown, columns]);
-
   const toggleSort = (key) => setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
-  const hasTotals = columns.some((c) => c.total);
+
+  // The rank column numbers rows in their CURRENT order, so it is looked up, not stored.
+  const position = useMemo(() => new Map(shown.map((r, index) => [r.itemCode, index + 1])), [shown]);
+  const gridColumns = useMemo(() => [
+    { key: '#rank', label: '#', sortable: false, render: (r) => <Text span size="sm" c="dimmed">{position.get(r.itemCode)}</Text> },
+    ...columns.map((c, index) => {
+      const total = c.total ? shown.reduce((a, r) => a + (r[c.key] ?? 0), 0) : undefined;
+      return {
+        key: c.key,
+        label: c.label,
+        align: c.align,
+        hint: c.hint,
+        render: (r) => (c.format ? c.format(r[c.key], r) : r[c.key]),
+        footer: c.total ? (c.format ? c.format(total, null) : total) : index === 0 ? 'Total' : null,
+      };
+    }),
+  ], [columns, shown, position]);
 
   return (
-    <div className="card">
-      <div className="modal-toolbar item-toolbar">
+    <Paper>
+      <Group gap="sm" mb="md" wrap="wrap">
         {toolbarExtra}
-        <input type="search" placeholder="Search name or code…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search items" />
+        <TextInput placeholder="Search name or code…" leftSection={<IconSearch size={16} />} value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)} aria-label="Search items" style={{ flex: '1 1 220px' }} maw={360} />
         {filterKey && (
-          <label>{filterLabel}
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="all">All</option>
-              {filterValues.map((v) => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </label>
+          <Select aria-label={filterLabel} placeholder={filterLabel} searchable allowDeselect={false} w={200}
+            data={[{ value: 'all', label: `Any ${filterLabel.toLowerCase()}` }, ...filterValues.map((v) => ({ value: v, label: v }))]}
+            value={filter} onChange={(v) => setFilter(v ?? 'all')} />
         )}
         {stockKey && (
-          <label>Stock
-            <select value={stock} onChange={(e) => setStock(e.target.value)}>
-              <option value="all">All</option>
-              <option value="in">In stock</option>
-              <option value="out">Out of stock</option>
-              <option value="low">Low (1-5)</option>
-            </select>
-          </label>
+          <Select aria-label="Stock" allowDeselect={false} w={150} data={STOCK_OPTIONS}
+            value={stock} onChange={(v) => setStock(v ?? 'all')} />
         )}
-        <span className="muted small">{shown.length} of {rows.length} items</span>
-        {updatedAt && (
-          <span className="muted small">updated {updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-        )}
-        {onRefresh && <button type="button" onClick={onRefresh}>Refresh</button>}
-      </div>
+        <Text size="sm" c="dimmed" ml="auto">
+          {shown.length} of {rows.length} items{updatedAt && ` · updated ${shortTime(updatedAt)}`}
+        </Text>
+        {onRefresh && <Button variant="default" leftSection={<IconRefresh size={16} />} onClick={onRefresh}>Refresh</Button>}
+      </Group>
 
-      <div className="table-scroll">
-        <table ref={columnsRef} className="product-table">
-          <thead>
-            <tr>
-              <th className="rank-cell">#</th>
-              {columns.map((c) => (
-                <th key={c.key} className={`${c.align === 'num' ? 'num' : ''}${sort.key === c.key ? ' sorted' : ''}`} title={c.hint}>
-                  <button className="sort-btn" onClick={() => toggleSort(c.key)}>
-                    {c.label}
-                    <span className="sort-arrow">{sort.key === c.key ? (sort.dir === 'asc' ? '▲' : '▼') : ''}</span>
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {shown.length === 0 && <tr><td className="empty" colSpan={columns.length + 1}>{emptyText}</td></tr>}
-            {shown.map((r, index) => (
-              <tr key={r.itemCode}>
-                <td className="rank-cell">{index + 1}</td>
-                {columns.map((c) => (
-                  <td key={c.key} className={c.align === 'num' ? 'num' : ''}>
-                    {c.format ? c.format(r[c.key], r) : r[c.key]}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-          {hasTotals && shown.length > 0 && (
-            <tfoot>
-              <tr>
-                <td className="rank-cell" />
-                {columns.map((c, i) => (
-                  <td key={c.key} className={c.align === 'num' ? 'num strong' : 'strong'}>
-                    {c.total ? (c.format ? c.format(totals[c.key], null) : totals[c.key]) : i === 0 ? 'Total' : ''}
-                  </td>
-                ))}
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-    </div>
+      <DataGrid
+        storageKey={`items-${columns.map((c) => c.key).join('-')}`}
+        rows={shown}
+        columns={gridColumns}
+        getRowId={(r) => r.itemCode}
+        sort={sort}
+        onSort={toggleSort}
+        showFooter={columns.some((c) => c.total)}
+        emptyText={emptyText}
+      />
+    </Paper>
   );
 }

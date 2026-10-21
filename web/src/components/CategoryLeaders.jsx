@@ -1,25 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Alert, Badge, Box, Group, Paper, Progress, SegmentedControl, Select, SimpleGrid, Stack, Text, Title, UnstyledButton,
+} from '@mantine/core';
+import { IconArrowRight } from '@tabler/icons-react';
 import { getJson } from '../api.js';
 import CategoryProductsModal from './CategoryProductsModal.jsx';
+import { MONTHS, money, num } from '../format.jsx';
 
-const num = new Intl.NumberFormat();
-const money = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 });
 const pct = (part, whole) => (whole ? Math.round((part / whole) * 100) : 0);
-const MONTHS = [
-  { value: '0', label: 'All months' },
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
-];
+const TOP_OPTIONS = [{ value: '1', label: 'Top 1' }, { value: '3', label: 'Top 3' }, { value: '5', label: 'Top 5' }];
 
 // Best-selling item(s) in every category for a chosen year.
 export default function CategoryLeaders({ metric }) {
@@ -71,103 +60,92 @@ export default function CategoryLeaders({ metric }) {
   const byRevenue = rankBy === 'revenue';
 
   return (
-    <div className="card wide">
-      <div className="card-header">
+    <Paper style={{ gridColumn: '1 / -1' }}>
+      <Group justify="space-between" align="flex-end" mb="md" gap="sm">
         <div>
-          <h3>{metric.title}</h3>
-          <p className="muted small">
+          <Title order={3} size="h5">{metric.title}</Title>
+          <Text size="sm" c="dimmed">
             Top {top === 1 ? 'item' : `${top} items`} in each category by {byRevenue ? 'revenue' : 'units sold'}
             {year && ` · ${periodLabel}`}{month === '0' && isCurrentYear && ' (year to date)'}
             {loading && ' · loading…'}
-          </p>
+          </Text>
         </div>
-        <div className="controls">
-          <label>
-            <span>Year</span>
-            <select value={year} onChange={(e) => setYear(e.target.value)} disabled={!years.length}>
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </label>
-          <label>
-            <span>Month</span>
-            <select value={month} onChange={(e) => setMonth(e.target.value)}>
-              {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-          </label>
-          <div className="segmented" role="group" aria-label="Rank by">
-            <button className={!byRevenue ? 'active' : ''} onClick={() => setRankBy('qty')}>Units sold</button>
-            <button className={byRevenue ? 'active' : ''} onClick={() => setRankBy('revenue')}>Revenue</button>
-          </div>
-          <label>
-            <span>Show</span>
-            <select value={top} onChange={(e) => setTop(Number(e.target.value))}>
-              <option value={1}>Top 1</option>
-              <option value={3}>Top 3</option>
-              <option value={5}>Top 5</option>
-            </select>
-          </label>
-        </div>
-      </div>
+        <Group gap="sm" align="flex-end">
+          <Select label="Year" size="xs" w={100} allowDeselect={false} disabled={!years.length}
+            data={years.map(String)} value={year || null} onChange={(v) => v && setYear(v)} />
+          <Select label="Month" size="xs" w={140} allowDeselect={false} data={MONTHS} value={month} onChange={(v) => v && setMonth(v)} />
+          <SegmentedControl size="xs" aria-label="Rank by" value={rankBy} onChange={setRankBy}
+            data={[{ value: 'qty', label: 'Units sold' }, { value: 'revenue', label: 'Revenue' }]} />
+          <Select label="Show" size="xs" w={100} allowDeselect={false} data={TOP_OPTIONS}
+            value={String(top)} onChange={(v) => v && setTop(Number(v))} />
+        </Group>
+      </Group>
 
-      {error && <p className="error">{error}</p>}
-      {rows && !categories.length && <p className="muted">No sales recorded in {periodLabel}.</p>}
+      {error && <Alert color="red" variant="light" mb="sm">{error}</Alert>}
+      {rows && !categories.length && <Text c="dimmed">No sales recorded in {periodLabel}.</Text>}
 
-      <div className={`leader-grid${loading ? ' is-loading' : ''}`}>
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3, xl: 4 }} style={{ opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s' }}>
         {categories.map((c) => {
           const [best, ...rest] = c.items;
           const share = byRevenue ? pct(best.revenue, c.categoryRevenue) : pct(best.qty, c.categoryQty);
           return (
-            <article
-              key={c.category}
-              className="leader-card clickable"
-              role="button"
-              tabIndex={0}
-              title={`View all ${c.category} products`}
-              onClick={() => setOpenCategory(c.category)}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setOpenCategory(c.category))}
-            >
-              <header>
-                <span className="leader-category">{c.category}</span>
-                <span className="muted small">
-                  {num.format(c.categoryQty)} units · {money.format(c.categoryRevenue)}
-                </span>
-              </header>
+            <UnstyledButton key={c.category} onClick={() => setOpenCategory(c.category)} title={`View all ${c.category} products`}>
+              <Paper p="md" h="100%" bg="var(--mantine-color-dark-7)" className="hover-lift">
+                <Stack gap="sm">
+                  <div>
+                    <Text size="xs" tt="uppercase" fw={700} c="blue.4" lts={0.5}>{c.category}</Text>
+                    <Text size="xs" c="dimmed">{num.format(c.categoryQty)} units · {money.format(c.categoryRevenue)}</Text>
+                  </div>
 
-              <div className="leader-best">
-                <span className="leader-badge">#1</span>
-                <div>
-                  <div className="leader-name" title={best.itemName}>{best.itemName}</div>
-                  <div className="muted small">{best.itemCode}</div>
-                </div>
-              </div>
+                  <Group gap="sm" wrap="nowrap" align="flex-start">
+                    <Badge size="lg" variant="filled" radius="sm" style={{ flexShrink: 0 }}>#1</Badge>
+                    <Box style={{ minWidth: 0 }}>
+                      <Text fw={600} size="sm" lineClamp={2} title={best.itemName}>{best.itemName}</Text>
+                      <Text size="xs" c="dimmed">{best.itemCode}</Text>
+                    </Box>
+                  </Group>
 
-              <dl className="leader-stats">
-                <div className={!byRevenue ? 'primary' : ''}><dt>Units sold</dt><dd>{num.format(best.qty)}</dd></div>
-                <div className={byRevenue ? 'primary' : ''}><dt>Revenue</dt><dd>{money.format(best.revenue)}</dd></div>
-                <div><dt>Invoices</dt><dd>{num.format(best.invoices)}</dd></div>
-              </dl>
+                  <Group gap="lg" wrap="wrap">
+                    {[
+                      ['Units sold', num.format(best.qty), !byRevenue],
+                      ['Revenue', money.format(best.revenue), byRevenue],
+                      ['Invoices', num.format(best.invoices), false],
+                    ].map(([label, value, primary]) => (
+                      <div key={label}>
+                        <Text size="xs" c="dimmed">{label}</Text>
+                        <Text size="sm" fw={primary ? 700 : 500} c={primary ? 'blue.4' : undefined} style={{ whiteSpace: 'nowrap' }}>{value}</Text>
+                      </div>
+                    ))}
+                  </Group>
 
-              <div className="share" title={`${share}% of category ${byRevenue ? 'revenue' : 'units'}`}>
-                <div className="share-bar"><span style={{ width: `${share}%` }} /></div>
-                <span className="muted small">{share}% of category {byRevenue ? 'revenue' : 'units'}</span>
-              </div>
+                  <div title={`${share}% of category ${byRevenue ? 'revenue' : 'units'}`}>
+                    <Progress value={share} size="sm" />
+                    <Text size="xs" c="dimmed" mt={4}>{share}% of category {byRevenue ? 'revenue' : 'units'}</Text>
+                  </div>
 
-              {rest.length > 0 && (
-                <ol className="leader-rest" start={2}>
-                  {rest.map((r) => (
-                    <li key={r.itemCode}>
-                      <span className="leader-rest-name" title={r.itemName}>{r.itemName}</span>
-                      <span className="muted">{byRevenue ? money.format(r.revenue) : `${num.format(r.qty)} units`}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
+                  {rest.length > 0 && (
+                    <Stack gap={2}>
+                      {rest.map((r, index) => (
+                        <Group key={r.itemCode} justify="space-between" wrap="nowrap" gap="xs">
+                          <Text size="xs" truncate title={r.itemName}>{index + 2}. {r.itemName}</Text>
+                          <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                            {byRevenue ? money.format(r.revenue) : `${num.format(r.qty)} units`}
+                          </Text>
+                        </Group>
+                      ))}
+                    </Stack>
+                  )}
 
-              <span className="leader-more">View all {num.format(c.categoryItems)} products sold →</span>
-            </article>
+                  <Group gap={4} c="blue.4">
+                    <Text size="xs" c="blue.4">View all {num.format(c.categoryItems)} products sold</Text>
+                    <IconArrowRight size={14} />
+                  </Group>
+                </Stack>
+              </Paper>
+            </UnstyledButton>
           );
         })}
-      </div>
+      </SimpleGrid>
 
       {openCategory && (
         <CategoryProductsModal
@@ -179,6 +157,6 @@ export default function CategoryLeaders({ metric }) {
           onClose={() => setOpenCategory(null)}
         />
       )}
-    </div>
+    </Paper>
   );
 }

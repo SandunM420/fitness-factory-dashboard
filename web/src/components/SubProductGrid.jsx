@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import useResizableColumns from '../useResizableColumns.js';
-
-const money = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 });
+import { Checkbox, Code, NumberInput, Paper, Select, Text } from '@mantine/core';
+import DataGrid from './DataGrid.jsx';
+import LineToolbar from './LineToolbar.jsx';
+import { Dash, money } from '../format.jsx';
 
 /**
  * Line-level editor for one product at one location.
  *
- * `+` opens a blank line, clicking a row puts it in edit mode, and nothing is
- * written until Save. Flavour and location are part of the primary key, so an
- * existing line shows them as text - change one by deleting and re-adding.
+ * `+` opens a blank line, the pencil puts selected rows in edit mode, and
+ * nothing is written until Save. Flavour and location are part of the primary
+ * key, so an existing line shows them as text - change one by deleting and re-adding.
  */
 export default function SubProductGrid({ row, flavours, busy, onCreate, onUpdate, onDelete }) {
-  const columnsRef = useResizableColumns('sub-product-grid');
   const [selected, setSelected] = useState(() => new Set());
   const [edits, setEdits] = useState({});          // key -> { qty, price, visible_on_web }
   const [newLine, setNewLine] = useState(null);    // blank draft, or null
@@ -66,108 +66,76 @@ export default function SubProductGrid({ row, flavours, busy, onCreate, onUpdate
     }
     reset();
   };
+
   // Flavours not yet used at this location - the rest would collide with the key.
   const available = flavours.filter((flavour) => !row.shown.some((v) => v.flavourId === flavour.id));
 
+  const columns = [
+    { key: 'variantCode', label: 'Sub-product', render: (v) => <Code>{v.variantCode}</Code> },
+    { key: 'flavour', label: 'Flavour' },
+    {
+      key: 'qty', label: 'Qty', align: 'num',
+      render: (v) => edits[v.key]
+        ? <NumberInput size="xs" w={90} ml="auto" min={0} allowDecimal={false} value={edits[v.key].qty} aria-label="Quantity"
+            onChange={(value) => editField(v.key, 'qty', value)} />
+        : v.qty,
+    },
+    {
+      key: 'price', label: 'Price', align: 'num',
+      render: (v) => edits[v.key]
+        ? <NumberInput size="xs" w={120} ml="auto" min={0} decimalScale={2} value={edits[v.key].price} aria-label="Price"
+            placeholder={String(row.price ?? '')} onChange={(value) => editField(v.key, 'price', value)} />
+        : v.effectivePrice ? money.format(v.effectivePrice) : <Dash />,
+    },
+    {
+      key: 'website', label: 'Website',
+      // Read-only until the row is put into edit mode with the pencil.
+      render: (v) => (
+        <Checkbox size="xs" disabled={working || !edits[v.key]} aria-label={`Show ${v.variantCode} on the website`}
+          checked={edits[v.key] ? edits[v.key].visible_on_web : v.visibleOnWeb}
+          onChange={(event) => editField(v.key, 'visible_on_web', event.currentTarget.checked)} />
+      ),
+    },
+  ];
+
+  const extraRow = newLine && {
+    control: <Checkbox size="xs" checked readOnly aria-label="New line" />,
+    cells: {
+      variantCode: <Text span size="sm" c="dimmed">auto</Text>,
+      flavour: <Select size="xs" w={180} autoFocus placeholder="Flavour…" aria-label="Flavour" searchable
+        data={available.map((flavour) => ({ value: String(flavour.id), label: flavour.name }))}
+        value={newLine.flavour_id || null} onChange={(value) => setNewLine({ ...newLine, flavour_id: value ?? '' })} />,
+      qty: <NumberInput size="xs" w={90} ml="auto" min={0} allowDecimal={false} value={newLine.qty} aria-label="Quantity"
+        onChange={(value) => setNewLine({ ...newLine, qty: value })} />,
+      price: <NumberInput size="xs" w={120} ml="auto" min={0} decimalScale={2} value={newLine.price} aria-label="Price"
+        placeholder={String(row.price ?? '')} onChange={(value) => setNewLine({ ...newLine, price: value })} />,
+      website: <Checkbox size="xs" checked={newLine.visible_on_web} aria-label="Show on website"
+        onChange={(event) => setNewLine({ ...newLine, visible_on_web: event.currentTarget.checked })} />,
+    },
+  };
+
   return (
-    <div className="line-grid">
-      <div className="line-toolbar">
-        <button type="button" className="icon-btn" title="New line" aria-label="New line"
-          disabled={working || newLine !== null || available.length === 0} onClick={addLine}>+</button>
-        <button type="button" className="icon-btn" title="Edit selected" aria-label="Edit selected"
-          disabled={working || selected.size === 0} onClick={editSelected}>✎</button>
-        <button type="button" className="icon-btn danger" title="Delete" aria-label="Delete"
-          disabled={working || selected.size === 0}
-          onClick={() => onDelete(row.shown.filter((v) => selected.has(v.key)), () => setSelected(new Set()))}>🗑</button>
-
-        {dirty && (
-          <>
-            <button type="button" className="save-btn" disabled={working || (newLine && !newLine.flavour_id)} onClick={save}>
-              Save
-            </button>
-            <button type="button" className="cancel-btn" disabled={working} onClick={reset}>
-              {newLine ? 'Cancel New' : 'Cancel'}
-            </button>
-          </>
-        )}
-      </div>
-
-      <table ref={columnsRef} className="product-table sub-table stock-table">
-        <thead>
-          <tr>
-            <th style={{ width: '2rem' }} />
-            <th>Sub-product</th><th>Flavour</th>
-            <th className="num">Qty</th><th className="num">Price</th><th>Website</th>
-          </tr>
-        </thead>
-        <tbody>
-          {row.shown.map((variant) => {
-            const draft = edits[variant.key];
-            return (
-              <tr key={variant.key}>
-                <td onClick={(event) => event.stopPropagation()}>
-                  <input type="checkbox" checked={selected.has(variant.key)} onChange={() => toggleSelect(variant.key)}
-                    aria-label={`Select ${variant.variantCode}`} />
-                </td>
-                <td><code>{variant.variantCode}</code></td>
-                <td>{variant.flavour}</td>
-                <td className="num">
-                  {draft
-                    ? <input type="number" min="0" value={draft.qty} style={{ width: '5rem' }}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => editField(variant.key, 'qty', event.target.value)} />
-                    : variant.qty}
-                </td>
-                <td className="num">
-                  {draft
-                    ? <input type="number" min="0" step="0.01" value={draft.price} style={{ width: '7rem' }}
-                        placeholder={row.price} onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => editField(variant.key, 'price', event.target.value)} />
-                    : variant.effectivePrice ? money.format(variant.effectivePrice) : <span className="muted">–</span>}
-                </td>
-                <td onClick={(event) => event.stopPropagation()}>
-                  {/* Read-only until the row is put into edit mode with the pencil. */}
-                  <input type="checkbox" disabled={working || !draft}
-                    aria-label={`Show ${variant.variantCode} on the website`}
-                    checked={draft ? draft.visible_on_web : variant.visibleOnWeb}
-                    onChange={(event) => editField(variant.key, 'visible_on_web', event.target.checked)} />
-                </td>
-              </tr>
-            );
-          })}
-
-          {newLine && (
-            <tr className="is-new">
-              <td><input type="checkbox" checked readOnly aria-label="New line" /></td>
-              <td><span className="muted">auto</span></td>
-              <td>
-                <select autoFocus required value={newLine.flavour_id}
-                  onChange={(event) => setNewLine({ ...newLine, flavour_id: event.target.value })}>
-                  <option value="">Flavour…</option>
-                  {available.map((flavour) => <option key={flavour.id} value={flavour.id}>{flavour.name}</option>)}
-                </select>
-              </td>
-              <td className="num">
-                <input type="number" min="0" value={newLine.qty} style={{ width: '5rem' }}
-                  onChange={(event) => setNewLine({ ...newLine, qty: event.target.value })} />
-              </td>
-              <td className="num">
-                <input type="number" min="0" step="0.01" value={newLine.price} style={{ width: '7rem' }}
-                  placeholder={row.price}
-                  onChange={(event) => setNewLine({ ...newLine, price: event.target.value })} />
-              </td>
-              <td>
-                <input type="checkbox" checked={newLine.visible_on_web}
-                  onChange={(event) => setNewLine({ ...newLine, visible_on_web: event.target.checked })} />
-              </td>
-            </tr>
-          )}
-
-          {row.shown.length === 0 && !newLine && (
-            <tr><td className="empty" colSpan={6}>(No data)</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+    <Paper p="sm" bg="var(--mantine-color-dark-7)">
+      <LineToolbar
+        onNew={addLine} newDisabled={working || newLine !== null || available.length === 0}
+        onEdit={editSelected} editDisabled={working || selected.size === 0}
+        onDelete={() => onDelete(row.shown.filter((v) => selected.has(v.key)), () => setSelected(new Set()))}
+        deleteDisabled={working || selected.size === 0}
+        dirty={dirty} saving={working} saveDisabled={Boolean(newLine && !newLine.flavour_id)}
+        onSave={save} onCancel={reset} cancelLabel={newLine ? 'Cancel new' : 'Cancel'}
+      />
+      <DataGrid
+        storageKey="sub-product-grid"
+        rows={row.shown}
+        columns={columns}
+        getRowId={(v) => v.key}
+        selected={selected}
+        onToggleSelect={toggleSelect}
+        extraRow={extraRow}
+        emptyText="(No data)"
+        maxHeight="none"
+        background="var(--mantine-color-dark-7)"
+      />
+    </Paper>
   );
 }

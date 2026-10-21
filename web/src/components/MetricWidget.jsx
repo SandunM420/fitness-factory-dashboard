@@ -1,25 +1,13 @@
 import { useEffect, useState } from 'react';
+import { Alert, Loader, Paper, Text, Title } from '@mantine/core';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList,
 } from 'recharts';
 import { getJson } from '../api.js';
 import DataTable from './DataTable.jsx';
-
-// Blue first (brand accent), then white and cool greys/blues that stay distinct on black.
-const COLORS = ['#3b82f6', '#e5e7eb', '#93c5fd', '#6b7280', '#1d4ed8'];
-const fmt = new Intl.NumberFormat();
-const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
-
-const tooltipProps = {
-  formatter: (v) => fmt.format(v),
-  contentStyle: {
-    background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8,
-    color: 'var(--text)', boxShadow: '0 4px 12px rgb(0 0 0 / 0.5)',
-  },
-  labelStyle: { color: 'var(--text)', fontWeight: 600, marginBottom: 4 },
-  itemStyle: { color: 'var(--text)' },
-  cursor: { fill: 'var(--border)', opacity: 0.4 },
-};
+import StatCard from './StatCard.jsx';
+import { compact, num } from '../format.jsx';
+import { CHART_COLORS, axisTick, gridStroke, tooltipProps } from '../charts.js';
 
 export default function MetricWidget({ metric, range }) {
   const [rows, setRows] = useState(null);
@@ -38,15 +26,22 @@ export default function MetricWidget({ metric, range }) {
     return () => { cancelled = true; };
   }, [metric.id, query]);
 
-  const body = error ? <p className="error">{error}</p>
-    : rows === null ? <p className="muted">Loading…</p>
+  if (metric.type === 'kpi') {
+    const raw = rows?.[0]?.value;
+    const v = typeof raw === 'string' && !Number.isNaN(Number(raw)) ? Number(raw) : raw;
+    const value = error ? '!' : rows === null ? <Loader size="sm" /> : typeof v === 'number' ? num.format(v) : v ?? '—';
+    return <StatCard label={metric.title} value={value} hint={error || undefined} />;
+  }
+
+  const body = error ? <Alert color="red" variant="light">{error}</Alert>
+    : rows === null ? <Loader size="sm" />
     : renderBody(metric, rows);
 
   return (
-    <div className={`card ${metric.type}${metric.wide ? ' wide' : ''}`}>
-      <h3>{metric.title}</h3>
+    <Paper style={metric.wide ? { gridColumn: '1 / -1' } : undefined}>
+      <Title order={3} size="h5" mb="md">{metric.title}</Title>
       {body}
-    </div>
+    </Paper>
   );
 }
 
@@ -60,16 +55,12 @@ function toNumbers(rows, keys) {
 }
 
 function renderBody(metric, rows) {
-  if (metric.type === 'kpi') {
-    const raw = rows[0]?.value;
-    const v = typeof raw === 'string' && !Number.isNaN(Number(raw)) ? Number(raw) : raw;
-    return <div className="kpi-value">{typeof v === 'number' ? fmt.format(v) : v ?? '—'}</div>;
-  }
-  if (!rows.length) return <p className="muted">No data</p>;
-  if (metric.type === 'table') return <DataTable rows={rows} />;
+  if (!rows.length) return <Text c="dimmed">No data</Text>;
+  if (metric.type === 'table') return <DataTable rows={rows} maxHeight={400} />;
 
   const ys = Array.isArray(metric.y) ? metric.y : [metric.y];
   const data = toNumbers(rows, ys);
+  const tooltip = { ...tooltipProps, formatter: (v) => num.format(v) };
 
   if (metric.type === 'bar' && metric.layout === 'horizontal') {
     const longest = Math.max(...data.map((r) => String(r[metric.x] ?? '').length));
@@ -77,14 +68,14 @@ function renderBody(metric, rows) {
     return (
       <ResponsiveContainer width="100%" height={Math.max(220, data.length * 34 + 40)}>
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, bottom: 4, left: 8 }} barCategoryGap={6}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" tickFormatter={(v) => compact.format(v)} tick={{ fontSize: 12 }} />
-          <YAxis type="category" dataKey={metric.x} width={labelWidth} tick={{ fontSize: 13 }} interval={0} />
-          <Tooltip {...tooltipProps} />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridStroke} />
+          <XAxis type="number" tickFormatter={(v) => compact.format(v)} tick={axisTick} />
+          <YAxis type="category" dataKey={metric.x} width={labelWidth} tick={{ ...axisTick, fontSize: 13 }} interval={0} />
+          <Tooltip {...tooltip} />
           {ys.length > 1 && <Legend />}
           {ys.map((y, i) => (
-            <Bar key={y} dataKey={y} name={metric.yLabel ?? y} fill={COLORS[i % COLORS.length]} radius={[0, 4, 4, 0]}>
-              {ys.length === 1 && <LabelList dataKey={y} position="right" formatter={(v) => fmt.format(v)} className="bar-label" />}
+            <Bar key={y} dataKey={y} name={metric.yLabel ?? y} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[0, 4, 4, 0]}>
+              {ys.length === 1 && <LabelList dataKey={y} position="right" formatter={(v) => num.format(v)} fill="var(--mantine-color-dark-1)" fontSize={12} />}
             </Bar>
           ))}
         </BarChart>
@@ -96,14 +87,14 @@ function renderBody(metric, rows) {
   return (
     <ResponsiveContainer width="100%" height={340}>
       <Chart data={data} margin={{ top: 12, right: 24, bottom: 8, left: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey={metric.x} tick={{ fontSize: 12 }} minTickGap={16} />
-        <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => compact.format(v)} />
-        <Tooltip {...tooltipProps} />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+        <XAxis dataKey={metric.x} tick={axisTick} minTickGap={16} />
+        <YAxis tick={axisTick} tickFormatter={(v) => compact.format(v)} />
+        <Tooltip {...tooltip} />
         {ys.length > 1 && <Legend />}
         {ys.map((y, i) => metric.type === 'line'
-          ? <Line key={y} type="monotone" dataKey={y} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
-          : <Bar key={y} dataKey={y} fill={COLORS[i % COLORS.length]} radius={[4, 4, 0, 0]} />)}
+          ? <Line key={y} type="monotone" dataKey={y} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={false} />
+          : <Bar key={y} dataKey={y} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />)}
       </Chart>
     </ResponsiveContainer>
   );

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Loader, SegmentedControl, SimpleGrid, Stack, Text } from '@mantine/core';
 import { getJson } from '../api.js';
 import ItemTable from '../components/ItemTable.jsx';
+import StatCard from '../components/StatCard.jsx';
 import { locationName, locationShort } from '../locations.js';
+import { money, num } from '../format.jsx';
 
-const money = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 });
-const num = new Intl.NumberFormat();
-const qty = (v) => (v ? num.format(v) : <span className="muted">0</span>);
+const qty = (v) => (v ? num.format(v) : <Text span c="dimmed">0</Text>);
 
 export default function StockByLocationPage() {
   const [data, setData] = useState(null);
@@ -49,58 +50,47 @@ export default function StockByLocationPage() {
 
   const columns = useMemo(() => [
     { key: 'itemCode', label: 'Code' },
-    { key: 'itemName', label: 'Item', format: (v) => <span className="product-name" title={v}>{v}</span> },
+    { key: 'itemName', label: 'Item', format: (v) => <Text span size="sm" fw={500} title={v}>{v}</Text> },
     { key: 'category', label: 'Category' },
     ...(picked
       ? [
-          { key: picked, label: `In stock · ${locationName(picked)}`, align: 'num', total: true, format: (v) => <strong>{num.format(v)}</strong> },
+          { key: picked, label: `In stock · ${locationName(picked)}`, align: 'num', total: true, format: (v) => <b>{num.format(v)}</b> },
           { key: 'total', label: 'All locations', align: 'num', total: true, format: qty },
         ]
       : [
           ...locations.map((code) => ({ key: code, label: locationName(code), align: 'num', total: true, format: qty })),
-          { key: 'total', label: 'Total', align: 'num', total: true, format: (v) => (v ? <strong>{num.format(v)}</strong> : <span className="muted">Out of stock</span>) },
+          { key: 'total', label: 'Total', align: 'num', total: true, format: (v) => (v ? <b>{num.format(v)}</b> : <Text span c="dimmed">Out of stock</Text>) },
         ]),
   ], [locations, picked]);
 
-  if (error) return <div className="card error">Could not load stock: {error}</div>;
-  if (!data) return <div className="card">Loading…</div>;
+  if (error) return <Alert color="red" variant="light" title="Could not load stock">{error}</Alert>;
+  if (!data) return <Loader />;
 
   const inStock = items.filter((r) => r.total > 0).length;
   const sum = (fn) => items.reduce((a, r) => a + fn(r), 0);
 
-  // The tiles double as the location filter: click one to narrow the table to that shop.
-  const Tile = ({ code, name, units, hint }) => (
-    <button
-      className={`card kpi stock-tile${location === code ? ' active' : ''}`}
-      onClick={() => setLocation(code)}
-      aria-pressed={location === code}
-      title={`Show ${name}`}
-    >
-      <h3>{name}</h3>
-      <div className="kpi-value">{num.format(units)}</div>
-      <div className="muted small kpi-hint">{hint}</div>
-    </button>
-  );
-
   return (
-    <div className="stock-page">
-      <section className="kpis">
+    <Stack gap="lg">
+      {/* The tiles double as the location filter: click one to narrow the table to that shop. */}
+      <SimpleGrid cols={{ base: 1, xs: 2, lg: Math.min(locations.length + 1, 4) }}>
         {locations.map((code) => (
-          <Tile
+          <StatCard
             key={code}
-            code={code}
-            name={locationName(code)}
-            units={sum((r) => r[code] ?? 0)}
+            label={locationName(code)}
+            value={num.format(sum((r) => r[code] ?? 0))}
             hint={`${num.format(items.filter((r) => r[code] > 0).length)} items · ${money.format(sum((r) => (r[code] ?? 0) * r.cost))} at cost`}
+            active={location === code}
+            onClick={() => setLocation(code)}
           />
         ))}
-        <Tile
-          code="all"
-          name="All locations"
-          units={sum((r) => r.total)}
+        <StatCard
+          label="All locations"
+          value={num.format(sum((r) => r.total))}
           hint={`${inStock} of ${items.length} items in stock · ${money.format(sum((r) => r.stockValue))} at cost`}
+          active={location === 'all'}
+          onClick={() => setLocation('all')}
         />
-      </section>
+      </SimpleGrid>
 
       <ItemTable
         rows={shown}
@@ -113,17 +103,11 @@ export default function StockByLocationPage() {
         updatedAt={updatedAt}
         initialSort={{ key: 'total', dir: 'desc' }}
         toolbarExtra={(
-          <div className="segmented" role="group" aria-label="Location">
-            <button className={location === 'all' ? 'active' : ''} onClick={() => setLocation('all')}>All</button>
-            {locations.map((code) => (
-              <button key={code} className={location === code ? 'active' : ''} onClick={() => setLocation(code)} title={locationName(code)}>
-                {locationShort(code)}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="Location" value={picked ?? 'all'} onChange={setLocation}
+            data={[{ value: 'all', label: 'All' }, ...locations.map((code) => ({ value: code, label: locationShort(code) }))]} />
         )}
         emptyText={picked ? `No stock at ${locationName(picked)} matches that search.` : 'No items match that search.'}
       />
-    </div>
+    </Stack>
   );
 }

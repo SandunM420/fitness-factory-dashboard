@@ -1,20 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import useResizableColumns from '../useResizableColumns.js';
+import {
+  ActionIcon, Alert, Badge, Box, Button, Grid, Group, Paper, Progress, SegmentedControl, SimpleGrid, Stack, Text, Title,
+  Tooltip as HoverTip, UnstyledButton,
+} from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
+import { useMediaQuery } from '@mantine/hooks';
+import { IconChevronLeft, IconChevronRight, IconRefresh } from '@tabler/icons-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { getJson } from '../api.js';
+import DataGrid from './DataGrid.jsx';
+import StatCard from './StatCard.jsx';
+import { compact, money, num, shortTime } from '../format.jsx';
+import { axisTick, gridStroke, tooltipProps } from '../charts.js';
 
 // Branch codes as stored in the database → names shown to users.
 const SHOPS = [
-  { code: 'all', name: 'All shops' },
-  { code: 'HCM', name: 'Havelock City Mall' },
-  { code: 'One_Galle_Face', name: 'One Galle Face' },
+  { code: 'all', name: 'All shops', short: 'All' },
+  { code: 'HCM', name: 'Havelock City Mall', short: 'HCM' },
+  { code: 'One_Galle_Face', name: 'One Galle Face', short: 'OGF' },
 ];
 const shopName = (code) => SHOPS.find((s) => s.code === code)?.name ?? code;
 const SHOP_COLORS = { HCM: '#3b82f6', One_Galle_Face: '#e5e7eb' };
-
-const num = new Intl.NumberFormat();
-const money = new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', maximumFractionDigits: 0 });
-const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
 const REFRESH_MS = 60_000;
 
 // Today's date in Sri Lanka (where the shops are), whatever timezone this browser is in.
@@ -30,15 +36,7 @@ function prettyDate(iso) {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
-const tooltipStyle = {
-  contentStyle: { background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)' },
-  labelStyle: { color: 'var(--text)', fontWeight: 600 },
-  itemStyle: { color: 'var(--text)' },
-  cursor: { fill: 'var(--border)', opacity: 0.4 },
-};
-
 export default function TodaySales() {
-  const columnsRef = useResizableColumns('today-sales');
   const [date, setDate] = useState(sriLankaToday);
   const [shop, setShop] = useState('all');
   const [lines, setLines] = useState(null);
@@ -46,6 +44,8 @@ export default function TodaySales() {
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null);
 
+  // Full shop names do not fit the switcher on a phone.
+  const narrow = useMediaQuery('(max-width: 36em)');
   const today = sriLankaToday();
   const isToday = date === today;
 
@@ -83,71 +83,99 @@ export default function TodaySales() {
       ].filter(Boolean).join(' · ')
     : undefined;
 
+  const invoiceColumns = [
+    { key: 'time', label: 'Time', render: (inv) => <b>{inv.time}</b> },
+    { key: 'invoiceNo', label: 'Invoice', render: (inv) => <Text span size="sm" c="dimmed">{inv.invoiceNo}</Text> },
+    ...(shop === 'all' ? [{
+      key: 'shop', label: 'Shop',
+      render: (inv) => <Badge variant="outline" color="gray" style={{ borderColor: SHOP_COLORS[inv.shop] }}>{shopName(inv.shop)}</Badge>,
+    }] : []),
+    { key: 'staff', label: 'Staff' },
+    {
+      key: 'items', label: 'Items', wrap: true,
+      render: (inv) => inv.items.map((it) => (
+        <Text key={it.itemCode} size="sm" truncate maw={320} title={it.itemName}>
+          {it.itemName} <Text span c="dimmed" inherit>×{num.format(it.qty)}</Text>
+        </Text>
+      )),
+    },
+    { key: 'payment', label: 'Payment' },
+    { key: 'revenue', label: 'Amount', align: 'num', render: (inv) => <b>{money.format(inv.revenue)}</b> },
+  ];
+
   return (
-    <main className="today">
-      <div className="card today-toolbar">
-        <div>
-          <p className="muted small">
+    <Stack gap="lg">
+      <Paper p="sm">
+        <Group justify="space-between" gap="sm">
+          <Text size="sm" c="dimmed">
             {prettyDate(date)}{isToday && ' · updates every minute'}
-            {updatedAt && ` · last updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+            {updatedAt && ` · last updated ${shortTime(updatedAt)}`}
             {loading && ' · loading…'}
-          </p>
-        </div>
-        <div className="controls">
-          <div className="segmented" role="group" aria-label="Shop">
-            {SHOPS.map((s) => (
-              <button key={s.code} className={shop === s.code ? 'active' : ''} onClick={() => setShop(s.code)}>{s.name}</button>
-            ))}
-          </div>
-          <div className="date-nav">
-            <button onClick={() => setDate(shiftDate(date, -1))} aria-label="Previous day">‹</button>
-            <input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} />
-            <button onClick={() => setDate(shiftDate(date, 1))} disabled={date >= today} aria-label="Next day">›</button>
-            <button onClick={() => setDate(today)} disabled={isToday}>Today</button>
-          </div>
-          <button onClick={() => load({ cancelled: false })} disabled={loading} title="Refresh now">↻ Refresh</button>
-        </div>
-      </div>
+          </Text>
+          <Group gap="sm">
+            <SegmentedControl aria-label="Shop" value={shop} onChange={setShop}
+              data={SHOPS.map((s) => ({ value: s.code, label: narrow ? s.short : s.name }))} />
+            <Group gap={4} wrap="nowrap">
+              <ActionIcon variant="default" size="lg" onClick={() => setDate(shiftDate(date, -1))} aria-label="Previous day">
+                <IconChevronLeft size={18} />
+              </ActionIcon>
+              <DatePickerInput w={130} value={date} maxDate={today} valueFormat="YYYY-MM-DD" aria-label="Date"
+                onChange={(value) => value && setDate(value)} />
+              <ActionIcon variant="default" size="lg" onClick={() => setDate(shiftDate(date, 1))} disabled={date >= today} aria-label="Next day">
+                <IconChevronRight size={18} />
+              </ActionIcon>
+              <Button variant="default" onClick={() => setDate(today)} disabled={isToday}>Today</Button>
+            </Group>
+            <HoverTip label="Refresh now">
+              <ActionIcon variant="default" size="lg" onClick={() => load({ cancelled: false })} loading={loading} aria-label="Refresh">
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </HoverTip>
+          </Group>
+        </Group>
+      </Paper>
 
-      {error && <div className="card error">Could not load sales: {error}</div>}
+      {error && <Alert color="red" variant="light" title="Could not load sales">{error}</Alert>}
 
-      <section className="kpis">
-        <Kpi label="Revenue" value={money.format(view.revenue)} />
-        <Kpi label="Invoices" value={num.format(view.invoices.length)} />
-        <Kpi label="Items sold" value={num.format(view.qty)} />
-        <Kpi label="Profit" value={view.costedRevenue ? money.format(view.profit) : '–'} hint={profitHint} />
-      </section>
+      <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
+        <StatCard label="Revenue" value={money.format(view.revenue)} />
+        <StatCard label="Invoices" value={num.format(view.invoices.length)} />
+        <StatCard label="Items sold" value={num.format(view.qty)} />
+        <StatCard label="Profit" value={view.costedRevenue ? money.format(view.profit) : '–'} hint={profitHint} />
+      </SimpleGrid>
 
       {shop === 'all' && (
-        <section className="shop-split">
+        <SimpleGrid cols={{ base: 1, sm: 2 }}>
           {SHOPS.filter((s) => s.code !== 'all').map((s) => {
             const t = view.byShop[s.code] ?? { revenue: 0, invoices: 0, qty: 0 };
             const share = view.revenue ? Math.round((t.revenue / view.revenue) * 100) : 0;
             return (
-              <button key={s.code} className="card shop-card" onClick={() => setShop(s.code)} title={`Show only ${s.name}`}>
-                <div className="shop-card-head">
-                  <span className="shop-dot" style={{ background: SHOP_COLORS[s.code] }} />
-                  <span className="shop-card-name">{s.name}</span>
-                  <span className="muted small">{share}% of revenue</span>
-                </div>
-                <div className="shop-card-value">{money.format(t.revenue)}</div>
-                <div className="muted small">{num.format(t.invoices)} invoices · {num.format(t.qty)} items</div>
-                <div className="share-bar"><span style={{ width: `${share}%`, background: SHOP_COLORS[s.code] }} /></div>
-              </button>
+              <UnstyledButton key={s.code} onClick={() => setShop(s.code)} title={`Show only ${s.name}`}>
+                <Paper className="hover-lift">
+                  <Group gap="xs" mb={4}>
+                    <Box w={10} h={10} style={{ borderRadius: '50%', background: SHOP_COLORS[s.code] }} />
+                    <Text fw={600}>{s.name}</Text>
+                    <Text size="xs" c="dimmed" ml="auto">{share}% of revenue</Text>
+                  </Group>
+                  <Text fz={26} fw={700}>{money.format(t.revenue)}</Text>
+                  <Text size="xs" c="dimmed" mb="xs">{num.format(t.invoices)} invoices · {num.format(t.qty)} items</Text>
+                  <Progress value={share} size="sm" color={SHOP_COLORS[s.code]} />
+                </Paper>
+              </UnstyledButton>
             );
           })}
-        </section>
+        </SimpleGrid>
       )}
 
-      <section className="card">
-        <h3>Sales by hour</h3>
-        {lines && !lines.length ? <p className="muted">No sales recorded {isToday ? 'yet today' : 'on this day'}.</p> : (
+      <Paper>
+        <Title order={3} size="h5" mb="md">Sales by hour</Title>
+        {lines && !lines.length ? <Text c="dimmed">No sales recorded {isToday ? 'yet today' : 'on this day'}.</Text> : (
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={view.hours} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v) => compact.format(v)} tick={{ fontSize: 12 }} />
-              <Tooltip {...tooltipStyle} formatter={(v, name) => [money.format(v), shopName(name)]} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+              <XAxis dataKey="label" tick={axisTick} />
+              <YAxis tickFormatter={(v) => compact.format(v)} tick={axisTick} />
+              <Tooltip {...tooltipProps} formatter={(v, name) => [money.format(v), shopName(name)]} />
               {shop === 'all' && <Legend formatter={(v) => shopName(v)} />}
               {(shop === 'all' ? ['HCM', 'One_Galle_Face'] : [shop]).map((code) => (
                 <Bar key={code} dataKey={code} stackId="shops" fill={SHOP_COLORS[code]} maxBarSize={48} />
@@ -155,69 +183,37 @@ export default function TodaySales() {
             </BarChart>
           </ResponsiveContainer>
         )}
-      </section>
+      </Paper>
 
-      <div className="today-grid">
-        <section className="card">
-          <h3>Invoices <span className="muted small">({num.format(view.invoices.length)})</span></h3>
-          {!view.invoices.length ? <p className="muted">No invoices.</p> : (
-            <div className="table-scroll">
-              <table ref={columnsRef} className="product-table invoice-table">
-                <thead>
-                  <tr>
-                    <th>Time</th><th>Invoice</th>{shop === 'all' && <th>Shop</th>}<th>Staff</th><th>Items</th><th>Payment</th><th className="num">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.invoices.map((inv) => (
-                    <tr key={inv.invoiceNo}>
-                      <td className="strong">{inv.time}</td>
-                      <td className="muted">{inv.invoiceNo}</td>
-                      {shop === 'all' && <td><span className="shop-tag" style={{ borderColor: SHOP_COLORS[inv.shop] }}>{shopName(inv.shop)}</span></td>}
-                      <td>{inv.staff}</td>
-                      <td>
-                        {inv.items.map((it) => (
-                          <div key={it.itemCode} className="invoice-item" title={it.itemName}>
-                            {it.itemName} <span className="muted">×{num.format(it.qty)}</span>
-                          </div>
-                        ))}
-                      </td>
-                      <td>{inv.payment}</td>
-                      <td className="num strong">{money.format(inv.revenue)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="card">
-          <h3>Top items</h3>
-          {!view.items.length ? <p className="muted">No items sold.</p> : (
-            <ol className="top-items">
-              {view.items.slice(0, 10).map((it) => (
-                <li key={it.itemCode}>
-                  <div className="top-item-name" title={it.itemName}>{it.itemName}</div>
-                  <div className="muted small">{it.category} · {num.format(it.qty)} sold</div>
-                  <div className="top-item-rev">{money.format(it.revenue)}</div>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-      </div>
-    </main>
-  );
-}
-
-function Kpi({ label, value, hint }) {
-  return (
-    <div className="card kpi">
-      <h3>{label}</h3>
-      <div className="kpi-value">{value}</div>
-      {hint && <div className="muted small kpi-hint">{hint}</div>}
-    </div>
+      <Grid gutter="lg" align="flex-start">
+        <Grid.Col span={{ base: 12, lg: 8 }}>
+          <Paper>
+            <Title order={3} size="h5" mb="md">Invoices <Text span c="dimmed" size="sm">({num.format(view.invoices.length)})</Text></Title>
+            <DataGrid storageKey="today-sales" rows={view.invoices} columns={invoiceColumns}
+              getRowId={(inv) => inv.invoiceNo} emptyText="No invoices." maxHeight={600} />
+          </Paper>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, lg: 4 }}>
+          <Paper>
+            <Title order={3} size="h5" mb="md">Top items</Title>
+            {!view.items.length ? <Text c="dimmed">No items sold.</Text> : (
+              <Stack gap="sm">
+                {view.items.slice(0, 10).map((it, index) => (
+                  <Group key={it.itemCode} wrap="nowrap" gap="sm" align="flex-start">
+                    <Text size="sm" c="dimmed" w={20} ta="right">{index + 1}.</Text>
+                    <Box style={{ flex: 1, minWidth: 0 }}>
+                      <Text size="sm" fw={500} truncate title={it.itemName}>{it.itemName}</Text>
+                      <Text size="xs" c="dimmed">{it.category} · {num.format(it.qty)} sold</Text>
+                    </Box>
+                    <Text size="sm" fw={600} style={{ whiteSpace: 'nowrap' }}>{money.format(it.revenue)}</Text>
+                  </Group>
+                ))}
+              </Stack>
+            )}
+          </Paper>
+        </Grid.Col>
+      </Grid>
+    </Stack>
   );
 }
 

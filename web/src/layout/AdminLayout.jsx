@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import Sidebar from './Sidebar.jsx';
+import { ActionIcon, AppShell, Box, Burger, Button, Code, Group, Paper, Text, Title, Tooltip } from '@mantine/core';
+import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout } from '@tabler/icons-react';
+import Sidebar, { Brand } from './Sidebar.jsx';
 
 const STORAGE_KEY = 'ff.sidebar.collapsed';
 const readCollapsed = () => {
@@ -17,40 +19,56 @@ export default function AdminLayout({ current, parentId, page, onNavigate, user,
   const navigate = (id) => { onNavigate(id); setMobileOpen(false); };
 
   return (
-    <div className={`admin${collapsed ? ' is-collapsed' : ''}`}>
-      <Sidebar
-        current={current}
-        parentId={parentId}
-        collapsed={collapsed}
-        mobileOpen={mobileOpen}
-        onNavigate={navigate}
-        onClose={() => setMobileOpen(false)}
-        user={user}
-      />
+    <AppShell
+      layout="alt"
+      header={{ height: 64 }}
+      navbar={{ width: collapsed ? 64 : 240, breakpoint: 'sm', collapsed: { mobile: !mobileOpen } }}
+      padding="lg"
+      styles={{
+        navbar: { background: 'var(--mantine-color-dark-8)', transition: 'width 0.18s ease' },
+        header: { background: 'var(--mantine-color-dark-7)' },
+      }}
+    >
+      <AppShell.Navbar>
+        <Group justify="space-between" wrap="nowrap">
+          {/* On a phone the menu is a drawer, so it always shows full labels. */}
+          <Box visibleFrom="sm"><Brand collapsed={collapsed} /></Box>
+          <Box hiddenFrom="sm" style={{ flex: 1 }}><Brand /></Box>
+          <Burger hiddenFrom="sm" opened size="sm" mr="md" onClick={() => setMobileOpen(false)} aria-label="Close menu" />
+        </Group>
+        <Box visibleFrom="sm" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Sidebar current={current} parentId={parentId} collapsed={collapsed} onNavigate={navigate} user={user} />
+        </Box>
+        <Box hiddenFrom="sm" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Sidebar current={current} parentId={parentId} onNavigate={navigate} user={user} />
+        </Box>
+      </AppShell.Navbar>
 
-      <div className="admin-main">
-        <header className="admin-bar">
-          <button className="icon-btn menu-toggle" onClick={() => setMobileOpen((v) => !v)} aria-label="Toggle menu">☰</button>
-          <button className="icon-btn collapse-toggle" onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            {collapsed ? '»' : '«'}
-          </button>
-          <div className="admin-bar-title">
-            <h1>{page?.title ?? page?.label ?? 'Not found'}</h1>
-            {page?.subtitle && <p className="small muted">{page.subtitle}</p>}
-          </div>
-          <div className="admin-user">
-            <span title={`${user.email} (${user.role})`}>{user.email}</span>
-            <button type="button" onClick={onSignOut}>Sign out</button>
-          </div>
-        </header>
+      <AppShell.Header px="md">
+        <Group h="100%" gap="sm" wrap="nowrap">
+          <Burger hiddenFrom="sm" opened={mobileOpen} onClick={() => setMobileOpen((v) => !v)} size="sm" aria-label="Toggle menu" />
+          <Tooltip label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            <ActionIcon visibleFrom="sm" variant="default" size="lg" onClick={() => setCollapsed((v) => !v)}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+              {collapsed ? <IconLayoutSidebarLeftExpand size={18} /> : <IconLayoutSidebarLeftCollapse size={18} />}
+            </ActionIcon>
+          </Tooltip>
+          <Box style={{ flex: 1, minWidth: 0 }}>
+            <Title order={1} fz={{ base: 'md', sm: 'lg' }} lineClamp={1}>{page?.title ?? page?.label ?? 'Not found'}</Title>
+            {page?.subtitle && <Text size="xs" c="dimmed" lineClamp={1} visibleFrom="xs">{page.subtitle}</Text>}
+          </Box>
+          <Text size="sm" c="dimmed" visibleFrom="md" title={`${user.email} (${user.role})`}>{user.email}</Text>
+          <Button variant="default" size="sm" onClick={onSignOut} leftSection={<IconLogout size={16} />}>
+            <Box component="span" visibleFrom="xs">Sign out</Box>
+          </Button>
+        </Group>
+      </AppShell.Header>
 
-        <main className="admin-content">
-          {page
-            ? page.element
-            : <div className="card"><h3>Page not found</h3><p className="muted">Nothing is registered at <code>#{current}</code>.</p></div>}
-        </main>
-      </div>
-    </div>
+      <AppShell.Main>
+        {page
+          ? page.element
+          : <Paper><Title order={3} size="h4">Page not found</Title><Text c="dimmed">Nothing is registered at <Code>#{current}</Code>.</Text></Paper>}
+      </AppShell.Main>
+    </AppShell>
   );
 }

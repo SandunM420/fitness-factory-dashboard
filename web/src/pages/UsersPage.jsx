@@ -2,22 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Badge, Button, Code, CopyButton, Group, Modal, Paper, Select, Stack, Table, Text, TextInput, Title,
 } from '@mantine/core';
-import { modals, ModalsProvider } from '@mantine/modals';
-import { notifications } from '@mantine/notifications';
+import { modals } from '@mantine/modals';
+import { notify } from '../notify.js';
 import { requestJson } from '../api.js';
 import RolePermissions from '../components/RolePermissions.jsx';
 
 const roleOptions = ['viewer', 'manager', 'admin'].map((value) => ({ value, label: roleLabel(value) }));
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
 
-const fail = (caught) => notifications.show({ color: 'red', title: 'Something went wrong', message: caught.message });
-const done = (message) => notifications.show({ color: 'green', message });
 
 export default function UsersPage() {
-  return <ModalsProvider><UsersContent /></ModalsProvider>;
-}
-
-function UsersContent() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
@@ -32,7 +26,7 @@ function UsersContent() {
       const data = await requestJson('/admin/users');
       setUsers(data.users);
     } catch (caught) {
-      fail(caught);
+      notify.error(caught.message);
     } finally {
       setLoading(false);
     }
@@ -50,7 +44,7 @@ function UsersContent() {
       setIssued({ email, password: data.tempPassword });
       setEmail(''); setRole('viewer');
       await load();
-    } catch (caught) { fail(caught); }
+    } catch (caught) { notify.error(caught.message); }
     finally { setBusy(''); }
   };
 
@@ -59,8 +53,8 @@ function UsersContent() {
     try {
       const data = await requestJson(`/admin/users/${user.id}/role`, { method: 'PATCH', body: { role: nextRole } });
       replaceUser(data.user);
-      done(`${user.email} is now ${roleLabel(nextRole).toLowerCase()}.`);
-    } catch (caught) { fail(caught); }
+      notify.success(`${user.email} is now ${roleLabel(nextRole).toLowerCase()}.`);
+    } catch (caught) { notify.error(caught.message); }
     finally { setBusy(''); }
   };
 
@@ -78,8 +72,8 @@ function UsersContent() {
         try {
           const data = await requestJson(`/admin/users/${user.id}/status`, { method: 'PATCH', body: { suspended: suspending } });
           replaceUser(data.user);
-          done(`${user.email} was ${suspending ? 'suspended' : 'restored'}.`);
-        } catch (caught) { fail(caught); }
+          notify.success(`${user.email} was ${suspending ? 'suspended' : 'restored'}.`);
+        } catch (caught) { notify.error(caught.message); }
         finally { setBusy(''); }
       },
     });
@@ -97,7 +91,7 @@ function UsersContent() {
           const data = await requestJson(`/admin/users/${user.id}/password-reset`, { method: 'POST' });
           setIssued({ email: user.email, password: data.tempPassword });
           await load();
-        } catch (caught) { fail(caught); }
+        } catch (caught) { notify.error(caught.message); }
         finally { setBusy(''); }
       },
     });
