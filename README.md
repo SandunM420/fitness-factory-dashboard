@@ -57,6 +57,7 @@ Check the connection: <http://localhost:4000/api/health> should return `{"ok":tr
 | `SUPABASE_SUPER_ADMIN_EMAILS` | `owner@example.com` | Verified accounts allowed to manage users; comma-separated |
 | `APP_ORIGIN` | `http://localhost:5173` | Allowed redirect target for invitations and password recovery |
 | `NODE_ENV` | `production` | Optional. Hides internal error messages from API responses |
+| `ENABLE_EXPLORER` | `true` | **Development only.** Turns on the Data explorer. Leave it unset in production: the `/schema` and `/tables/...` routes are then never registered, and no role can be granted the page |
 
 `api/.env` is git-ignored. **Never commit it, and never put credentials in `web/`.**
 
@@ -130,8 +131,8 @@ Requests are limited to 120 per minute per IP.
 | `/admin/users` | Super-admin-only user listing and management |
 | `/metrics` | Lists the metrics shown on the dashboard (without SQL; hidden metrics are left out) |
 | `/metrics/:id?…params` | Runs a metric → `{ rows: [...] }` |
-| `/schema` | Tables and columns, used by the Data explorer (blocked tables left out) |
-| `/tables/:schema/:table/rows?page=1&pageSize=100` | Paged rows of a table → `{ rows, total, page, pageSize, hiddenColumns }`. `pageSize` is at most 1000. Binary columns (e.g. `Stock.pics`) are left out |
+| `/schema` | **Development only** (`ENABLE_EXPLORER=true`). Tables and columns, used by the Data explorer (blocked tables left out) |
+| `/tables/:schema/:table/rows?page=1&pageSize=100` | **Development only** (`ENABLE_EXPLORER=true`). Paged rows of a table → `{ rows, total, page, pageSize, hiddenColumns }`. `pageSize` is at most 1000. Binary columns (e.g. `Stock.pics`) are left out |
 
 ### Metrics registry ([`api/_src/metrics.js`](api/_src/metrics.js))
 
@@ -467,7 +468,8 @@ These were found by checking the live data. Each one produces wrong numbers if y
 - **User administration:** the Supabase secret key is server-only. Each admin request first validates the current session and then requires the `super_admin` role.
 - **No SQL from the browser:** only predefined queries (`metrics.js`) with validated, typed parameters run. Table and column names in the explorer come from the system catalog, never from user input, and are bracket-quoted.
 - **Read-only login:** the database login is `db_datareader`, so it can't change data even if the API were compromised.
-- **Blocked tables:** `dbo.users` (plain-text passwords) and `dbo.UserPermissions` are hidden from `/schema` and `/tables`. Add any other sensitive tables to `BLOCKED_TABLES` in `routes.js`.
+- **The Data explorer is a development tool, not a feature of the live site.** It can read any POS table, including `customer` phone numbers, the `SMS` history, `Bank` account numbers and the POS settings tables. Its routes are registered only when `ENABLE_EXPLORER=true`, so in production they return 404 and `explorer` is not offered to any role — hiding the menu entry alone would not have helped, because the endpoints answer regardless of what the menu shows.
+- **Blocked tables:** `dbo.users` (plain-text passwords) and `dbo.UserPermissions` are hidden from `/schema` and `/tables`. Add any other sensitive tables to `BLOCKED_TABLES` in `routes.js` (lower-case — `isBlocked` compares lower-cased names).
 - **Hidden columns:** binary columns (`image`, `varbinary`, …) are never sent to the browser.
 - **Hardening:** `helmet` security headers, CORS restricted to `CORS_ORIGIN`, rate limit of 120 requests per minute, and generic error messages when `NODE_ENV=production`.
 

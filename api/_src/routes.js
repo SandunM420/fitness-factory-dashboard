@@ -4,9 +4,13 @@ import { metrics } from './metrics.js';
 import { login, logout, publicUser, requireAuth, roleForUser, updatePassword } from './auth.js';
 import adminRoutes from './admin.js';
 import catalogRoutes from './catalog.js';
-import { canAccessPage, pagesForRole } from './permissions.js';
+import { canAccessPage, explorerEnabled, pagesForRole } from './permissions.js';
 
 const router = Router();
+// Mounted at the bottom of this file, and only when the explorer is enabled, so
+// in production these endpoints do not exist at all rather than merely being
+// hidden from the menu or refused by a role check.
+const explorer = Router();
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Tables that must never be exposed through the explorer (credentials, permissions).
@@ -123,7 +127,7 @@ function dateParam(request, name, raw) {
 }
 
 // Schema explorer: tables and their columns.
-router.get('/schema', requirePage('explorer'), wrap(async (_req, res) => {
+explorer.get('/schema', requirePage('explorer'), wrap(async (_req, res) => {
   const result = await (await getPool()).request().query(`
     SELECT c.TABLE_SCHEMA AS [schema], c.TABLE_NAME AS [table], c.COLUMN_NAME AS [column],
            c.DATA_TYPE AS [type], c.IS_NULLABLE AS [nullable]
@@ -151,7 +155,7 @@ const quote = (id) => `[${id.replace(/]/g, ']]')}]`;
 
 // Page through all rows of a table. The table and column names come from the
 // catalog, never from user input, so identifiers can't be injected.
-router.get('/tables/:schema/:table/rows', requirePage('explorer'), wrap(async (req, res) => {
+explorer.get('/tables/:schema/:table/rows', requirePage('explorer'), wrap(async (req, res) => {
   const { schema, table } = req.params;
   if (isBlocked(schema, table)) return res.status(404).json({ error: 'Unknown table' });
   const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 100, 1), 1000);
@@ -204,5 +208,7 @@ router.get('/tables/:schema/:table/rows', requirePage('explorer'), wrap(async (r
     hiddenColumns: hidden,
   });
 }));
+
+if (explorerEnabled) router.use(explorer);
 
 export default router;

@@ -9,6 +9,12 @@
 // row gets the DEFAULTS below, so access control never silently falls open.
 import { all, run, now } from './store.js';
 
+// The Data explorer can read any POS table, including customer phone numbers and
+// the SMS history, so it is a development tool rather than a feature of the live
+// site: without ENABLE_EXPLORER=true its routes are never registered and no role
+// can be granted the page. Set it in api/.env locally, never in production.
+export const explorerEnabled = process.env.ENABLE_EXPLORER === 'true';
+
 /** Every page a role can be granted. `group` only affects how the matrix is drawn. */
 export const PAGES = [
   { id: 'dashboard', label: 'Dashboard', group: 'Dashboard' },
@@ -19,7 +25,7 @@ export const PAGES = [
   { id: 'subproducts', label: 'Sub-products', group: 'Products', note: 'Flat list of every flavour created' },
   { id: 'flavours', label: 'Flavours', group: 'Products', note: 'Master flavour list' },
   { id: 'explorer', label: 'Data explorer', group: 'Data explorer', note: 'Raw access to every POS table' },
-];
+].filter((page) => page.id !== 'explorer' || explorerEnabled);
 
 export const PAGE_IDS = PAGES.map((page) => page.id);
 
