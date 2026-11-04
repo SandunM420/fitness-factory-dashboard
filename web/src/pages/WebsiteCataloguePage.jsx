@@ -17,6 +17,11 @@ function ProductEditor({ product, categories, units, onClose, onUpdated }) {
     brand: product.website.brand ?? '',
     category: product.website.category ?? '',
     description: product.website.description ?? '',
+    image_url: product.website.image_url ?? '',
+    benefits: product.website.benefits ?? '',
+    ingredients: product.website.ingredients ?? '',
+    usage: product.website.usage ?? '',
+    warnings: product.website.warnings ?? '',
     status: product.website.status ?? 'draft',
   });
   const [sizes, setSizes] = useState(product.sizes ?? []);
@@ -87,6 +92,16 @@ function ProductEditor({ product, categories, units, onClose, onUpdated }) {
             </Group>
             <Textarea label="Description" minRows={4} maxLength={4000} value={draft.description}
               onChange={(event) => setDraft({ ...draft, description: event.currentTarget.value })} />
+            <TextInput label="Product image URL" description="Temporary placeholders are allowed; replace with approved product photography before launch." value={draft.image_url}
+              onChange={(event) => setDraft({ ...draft, image_url: event.currentTarget.value })} />
+            <Textarea label="Benefits" description="One benefit per line" minRows={3} maxLength={4000} value={draft.benefits}
+              onChange={(event) => setDraft({ ...draft, benefits: event.currentTarget.value })} />
+            <Textarea label="Ingredients" minRows={3} maxLength={8000} value={draft.ingredients}
+              onChange={(event) => setDraft({ ...draft, ingredients: event.currentTarget.value })} />
+            <Textarea label="How to use" minRows={3} maxLength={4000} value={draft.usage}
+              onChange={(event) => setDraft({ ...draft, usage: event.currentTarget.value })} />
+            <Textarea label="Warnings" minRows={3} maxLength={4000} value={draft.warnings}
+              onChange={(event) => setDraft({ ...draft, warnings: event.currentTarget.value })} />
             <Group justify="flex-end"><Button color="orange" loading={busy === 'product'} onClick={saveProduct}>Save product</Button></Group>
           </Stack>
         </Paper>

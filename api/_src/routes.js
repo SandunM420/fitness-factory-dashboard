@@ -4,6 +4,7 @@ import { metrics } from './metrics.js';
 import { login, logout, publicUser, requireAuth, roleForUser, updatePassword } from './auth.js';
 import adminRoutes from './admin.js';
 import catalogRoutes from './catalog.js';
+import storefrontRoutes from './storefront.js';
 import { canAccessPage, explorerEnabled, pagesForRole } from './permissions.js';
 
 const router = Router();
@@ -31,6 +32,10 @@ router.post('/auth/login', wrap(login));
 router.post('/auth/logout', wrap(logout));
 router.get('/auth/session', requireAuth, wrap(async (req, res) => res.json({ user: await publicUser(req.user) })));
 router.post('/auth/password', requireAuth, wrap(updatePassword));
+
+// Public storefront data is a narrow read-only projection. It is mounted
+// before admin authentication and never returns POS costs, locations or counts.
+router.use('/storefront', storefrontRoutes);
 
 // Everything below this line contains business data and requires a valid user.
 router.use(requireAuth);

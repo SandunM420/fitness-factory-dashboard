@@ -54,10 +54,18 @@ router.patch('/products/:itemCode', wrap(async (req, res) => {
   const title = cleanText(req.body?.title, 160) || null;
   const brand = cleanText(req.body?.brand, 100) || null;
   const description = cleanText(req.body?.description, 4000) || null;
+  const imageUrl = cleanText(req.body?.image_url, 1000) || null;
+  const benefits = cleanText(req.body?.benefits, 4000) || null;
+  const ingredients = cleanText(req.body?.ingredients, 8000) || null;
+  const usage = cleanText(req.body?.usage, 4000) || null;
+  const warnings = cleanText(req.body?.warnings, 4000) || null;
   const category = req.body?.category ? cleanText(req.body.category, 40) : null;
   const status = cleanText(req.body?.status || 'draft', 20).toLowerCase();
   if (category && !WEB_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Pick an approved website category' });
   if (!PRODUCT_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid product status' });
+  if (imageUrl && !/^https:\/\//i.test(imageUrl) && !imageUrl.startsWith('/')) {
+    return res.status(400).json({ error: 'Image must use HTTPS or a local / path' });
+  }
   if (status === 'active') {
     if (!title || !brand || !category) return res.status(400).json({ error: 'Active products require a title, brand and website category' });
     const { count } = await get('SELECT COUNT(*) AS count FROM product_sizes WHERE item_code = ? AND active = 1', itemCode);
@@ -71,7 +79,13 @@ router.patch('/products/:itemCode', wrap(async (req, res) => {
       title = excluded.title, brand = excluded.brand, category = excluded.category,
       description = excluded.description, status = excluded.status, updated_at = excluded.updated_at`,
   itemCode, title, brand, category, description, status, now());
-  return res.json({ product: toRow(await get('SELECT * FROM website_products WHERE item_code = ?', itemCode)) });
+  await run(`INSERT INTO product_merchandising (item_code, image_url, benefits, ingredients, usage, warnings, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (item_code) DO UPDATE SET image_url=excluded.image_url, benefits=excluded.benefits,
+      ingredients=excluded.ingredients, usage=excluded.usage, warnings=excluded.warnings, updated_at=excluded.updated_at`,
+  itemCode, imageUrl, benefits, ingredients, usage, warnings, now());
+  return res.json({ product: { ...toRow(await get('SELECT * FROM website_products WHERE item_code = ?', itemCode)),
+    ...toRow(await get('SELECT image_url, benefits, ingredients, usage, warnings FROM product_merchandising WHERE item_code = ?', itemCode)) } });
 }));
 
 const sizeById = async (id) => toRow(await get('SELECT * FROM product_sizes WHERE id = ?', id));
@@ -234,16 +248,18 @@ const PRODUCTS_SQL = `
  */
 router.get('/products', wrap(async (req, res) => {
   // The POS and the app database are independent, so ask both at once.
-  const [posRows, variants, flavours, websiteProducts, sizes] = await Promise.all([
+  const [posRows, variants, flavours, websiteProducts, merchandising, sizes] = await Promise.all([
     getPool().then((pool) => pool.request().query(PRODUCTS_SQL)).then((r) => r.recordset),
     all('SELECT * FROM product_variants').then((rows) => rows.map(toRow)),
     all('SELECT * FROM flavours').then((rows) => rows.map(toRow)),
     all('SELECT * FROM website_products').then((rows) => rows.map(toRow)),
+    all('SELECT * FROM product_merchandising').then((rows) => rows.map(toRow)),
     all('SELECT * FROM product_sizes ORDER BY item_code, sort_order, label').then((rows) => rows.map(toRow)),
   ]);
 
   const flavourMap = new Map(flavours.map((f) => [f.id, f]));
   const websiteMap = new Map(websiteProducts.map((p) => [p.item_code, p]));
+  const merchandisingMap = new Map(merchandising.map((p) => [p.item_code, p]));
   const byItem = new Map();
   const locations = new Set();
 
@@ -259,7 +275,7 @@ router.get('/products', wrap(async (req, res) => {
         cost: row.cost,
         pos: {},
         variants: [],
-        website: website ?? { item_code: row.itemCode, title: null, brand: null, category: null, description: null, status: 'draft' },
+        website: { ...(website ?? { item_code: row.itemCode, title: null, brand: null, category: null, description: null, status: 'draft' }), ...(merchandisingMap.get(row.itemCode) ?? {}) },
         sizes: sizes.filter((size) => size.item_code === row.itemCode),
       });
     }

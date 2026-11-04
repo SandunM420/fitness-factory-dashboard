@@ -63,6 +63,15 @@ const SCHEMA = [
     status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
     updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS product_merchandising (
+    item_code        TEXT PRIMARY KEY,
+    image_url        TEXT,
+    benefits         TEXT,
+    ingredients      TEXT,
+    usage            TEXT,
+    warnings         TEXT,
+    updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  )`,
   // Size/weight belongs to the website catalogue because VinSim does not carry
   // it. `code` becomes the stable SKU segment (for example 2LB or 500G).
   `CREATE TABLE IF NOT EXISTS product_sizes (

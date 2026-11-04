@@ -2,9 +2,10 @@
   "name": "fitness-factory",
   "private": true,
   "scripts": {
-    "install:all": "npm install && cd api && npm install && cd ../web && npm install",
+    "install:all": "npm install && cd api && npm install && cd ../web && npm install && cd ../storefront && npm install",
     "dev": "concurrently -n api,web -c blue,green \"npm run dev --prefix api\" \"npm run dev --prefix web\"",
     "build": "npm run build --prefix web",
+    "build:storefront": "npm run build --prefix storefront",
     "start": "npm start --prefix api"
   },
   "devDependencies": {
