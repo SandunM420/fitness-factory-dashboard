@@ -43,6 +43,8 @@ The storefront creates orders through `POST /api/storefront/checkout`. The API r
 
 Orders start as `pending_payment`. Visa/Mastercard and Koko are integration boundaries only: this application does not render card fields, receive PAN/CVV data or claim payment success. Merchant credentials, signed provider callbacks, delivery pricing and final policy/legal copy must be approved and configured before launch. Until then the confirmation explicitly says payment is pending.
 
+`CHECKOUT_ENABLED` is fail-closed: checkout returns `503` unless its value is exactly `true`. Enable it only after the approved payment hand-off and signed callback are implemented and tested. Checkout is additionally limited to eight attempts per IP per 15 minutes.
+
 The protected `/admin` order workspace lists reservations and allows operational state changes. `/api` remains the backend namespace. `ENABLE_EXPLORER` must remain unset/false in production.
 
 ## Pre-launch placeholders

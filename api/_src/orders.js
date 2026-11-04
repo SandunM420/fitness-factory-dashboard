@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { all, batch, get, now, run } from './store.js';
 
@@ -24,7 +25,12 @@ async function customerFor(req) {
     WHERE s.token_hash=? AND s.expires_at>?`, tokenHash(token), Date.now());
 }
 
-router.post('/checkout', wrap(async (req, res) => {
+const checkoutLimit = rateLimit({ windowMs: 15 * 60_000, limit: 8, standardHeaders: true, legacyHeaders: false });
+router.post('/checkout', checkoutLimit, wrap(async (req, res) => {
+  // Fail closed until final policies, delivery charges and a payment provider
+  // with verified callbacks are configured. This prevents unpaid reservations
+  // from exhausting sellable stock during the pre-launch period.
+  if (process.env.CHECKOUT_ENABLED !== 'true') return res.status(503).json({ error: 'Online checkout is not open yet.' });
   const name = clean(req.body?.name, 100), email = clean(req.body?.email, 254).toLowerCase();
   const phone = clean(req.body?.phone, 24), address = clean(req.body?.address, 300);
   const city = clean(req.body?.city, 80), notes = clean(req.body?.notes, 500);
