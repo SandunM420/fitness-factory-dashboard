@@ -1,12 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm install --include=dev --prefix web && npm install --prefix api",
+  "installCommand": "npm install --include=dev --prefix storefront && npm install --include=dev --prefix web && npm install --prefix api",
   "buildCommand": "npm run build --prefix web",
-  "outputDirectory": "web/dist",
+  "outputDirectory": "dist",
   "functions": {
     "api/index.js": { "maxDuration": 60 }
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" }
+    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/admin/:path*", "destination": "/admin/index.html" },
+    { "source": "/((?!api|admin|assets).*)", "destination": "/index.html" }
   ]
 }

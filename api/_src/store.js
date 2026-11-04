@@ -104,6 +104,33 @@ const SCHEMA = [
     PRIMARY KEY (item_code, flavour_id, location)
   )`,
   'CREATE INDEX IF NOT EXISTS product_variants_location_idx ON product_variants (location, qty)',
+  `CREATE TABLE IF NOT EXISTS customers (
+    id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE, name TEXT NOT NULL,
+    phone TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS customer_sessions (
+    token_hash TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS orders (
+    id TEXT PRIMARY KEY, order_number TEXT NOT NULL UNIQUE, customer_id TEXT NOT NULL REFERENCES customers(id),
+    status TEXT NOT NULL DEFAULT 'pending_payment', payment_method TEXT NOT NULL,
+    payment_reference TEXT, subtotal REAL NOT NULL, delivery_fee REAL NOT NULL DEFAULT 0, total REAL NOT NULL,
+    delivery_name TEXT NOT NULL, delivery_phone TEXT NOT NULL, delivery_address TEXT NOT NULL,
+    delivery_city TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    item_code TEXT NOT NULL, title TEXT NOT NULL, size_id INTEGER, size_label TEXT,
+    flavour_id INTEGER, flavour_name TEXT, quantity INTEGER NOT NULL CHECK(quantity > 0),
+    unit_price REAL NOT NULL, line_total REAL NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS order_reservations (
+    order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE, item_code TEXT NOT NULL,
+    flavour_id INTEGER NOT NULL, location TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity > 0),
+    PRIMARY KEY(order_id,item_code,flavour_id,location)
+  )`,
+  'CREATE INDEX IF NOT EXISTS orders_customer_idx ON orders (customer_id, created_at DESC)',
 ];
 
 // Created once per process (one round trip); every query waits for it. A
@@ -137,6 +164,12 @@ export async function all(sql, ...args) {
 export async function run(sql, ...args) {
   const result = await execute(sql, args);
   return { changes: result.rowsAffected, lastInsertRowid: result.lastInsertRowid === undefined ? undefined : Number(result.lastInsertRowid) };
+}
+
+/** Execute a group of writes atomically. */
+export async function batch(statements) {
+  await init();
+  return client.batch(statements.map(({ sql, args = [] }) => ({ sql, args })), 'write');
 }
 
 // SQLite has no boolean type; turn these 0/1 columns back into true/false for JSON.

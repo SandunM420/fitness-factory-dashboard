@@ -37,3 +37,18 @@ The product detail template deliberately shows a labelled temporary placeholder 
 - Checkout and account endpoints must validate every field server-side and use HttpOnly sessions.
 - Delivery and returns copy is intentionally labelled provisional until the owner confirms policy.
 - Storefront deployment, production changes, payment-provider setup and domain changes require explicit owner approval.
+# Checkout and orders
+
+The storefront creates orders through `POST /api/storefront/checkout`. The API revalidates published products, options, prices and available website stock; the browser's totals are never trusted. Customer sessions use an HttpOnly cookie and `/account` shows only that customer's order history.
+
+Orders start as `pending_payment`. Visa/Mastercard and Koko are integration boundaries only: this application does not render card fields, receive PAN/CVV data or claim payment success. Merchant credentials, signed provider callbacks, delivery pricing and final policy/legal copy must be approved and configured before launch. Until then the confirmation explicitly says payment is pending.
+
+The protected `/admin` order workspace lists reservations and allows operational state changes. `/api` remains the backend namespace. `ENABLE_EXPLORER` must remain unset/false in production.
+
+## Pre-launch placeholders
+
+- Delivery time, charges and service areas
+- Returns eligibility and time limits
+- Privacy retention/contact details
+- Terms, merchant identity and dispute language
+- Approved payment provider credentials and webhook verification

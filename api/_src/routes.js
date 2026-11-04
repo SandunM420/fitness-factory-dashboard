@@ -5,6 +5,8 @@ import { login, logout, publicUser, requireAuth, roleForUser, updatePassword } f
 import adminRoutes from './admin.js';
 import catalogRoutes from './catalog.js';
 import storefrontRoutes from './storefront.js';
+import orderRoutes from './orders.js';
+import commerceRoutes from './commerce.js';
 import { canAccessPage, explorerEnabled, pagesForRole } from './permissions.js';
 
 const router = Router();
@@ -36,6 +38,7 @@ router.post('/auth/password', requireAuth, wrap(updatePassword));
 // Public storefront data is a narrow read-only projection. It is mounted
 // before admin authentication and never returns POS costs, locations or counts.
 router.use('/storefront', storefrontRoutes);
+router.use('/storefront', orderRoutes);
 
 // Everything below this line contains business data and requires a valid user.
 router.use(requireAuth);
@@ -55,6 +58,7 @@ const requirePage = (...pageIds) => (req, res, next) => {
 
 // Mounted after requirePage is defined - a const is not hoisted.
 router.use('/catalog', requirePage('catalogue', 'webstock', 'subproducts', 'flavours'), catalogRoutes);
+router.use('/commerce', requirePage('orders'), commerceRoutes);
 
 // List metric definitions (without SQL), limited to pages the caller may open.
 router.get('/metrics', wrap(async (req, res) => {

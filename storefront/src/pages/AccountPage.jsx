@@ -1,0 +1,7 @@
+import { useEffect, useState } from 'react';
+import { money } from '../lib.js';
+export default function AccountPage() {
+  const [state, setState] = useState({ loading: true, data: null, error: '' });
+  useEffect(() => { const controller = new AbortController(); fetch('/api/storefront/account/orders', { credentials: 'same-origin', signal: controller.signal }).then(async (response) => { const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || 'Unable to load orders.'); return body; }).then((data) => setState({ loading: false, data, error: '' })).catch((error) => { if (error.name !== 'AbortError') setState({ loading: false, data: null, error: error.message }); }); return () => controller.abort(); }, []);
+  return <main className="page section-pad narrow"><p className="eyebrow">Your account</p><h1>Order history.</h1>{state.loading && <p role="status">Loading orders…</p>}{state.error && <div className="policy-note"><b>This device is not signed in</b><p>{state.error} Complete checkout on this device to securely link your orders.</p></div>}{state.data && <><h2>{state.data.customer.name}</h2><p>{state.data.customer.email}</p><div className="order-history">{state.data.orders.length ? state.data.orders.map((order) => <article key={order.order_number}><div><b>{order.order_number}</b><span>{new Date(order.created_at).toLocaleDateString('en-LK')}</span></div><strong>{money.format(order.total)}</strong><em>{order.status.replaceAll('_', ' ')}</em></article>) : <p>No orders yet.</p>}</div></>}</main>;
+}

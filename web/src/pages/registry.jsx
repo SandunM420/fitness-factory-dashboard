@@ -9,6 +9,7 @@ import FlavoursPage from './FlavoursPage.jsx';
 import SubProductsPage from './SubProductsPage.jsx';
 import CommercePlaceholderPage from './CommercePlaceholderPage.jsx';
 import WebsiteCataloguePage from './WebsiteCataloguePage.jsx';
+import OrdersPage from './OrdersPage.jsx';
 
 /**
  * The whole admin menu lives here. To add a page:
@@ -33,12 +34,7 @@ export const MENU = [
     icon: 'orders',
     title: 'Online orders',
     subtitle: 'Review payments, reserve exact variants and move accepted orders into transfer',
-    element: <CommercePlaceholderPage title="Online orders" description="The order workspace will protect exact flavour-and-weight reservations from payment through delivery."
-      items={[
-        { title: 'New and paid orders', text: 'A prioritised queue with payment, acceptance and fulfilment states.', state: 'planned' },
-        { title: 'Variant reservations', text: 'Reserved units remain unavailable to other customers.', state: 'protected' },
-        { title: 'Immutable timeline', text: 'Every staff, payment, stock and delivery event is recorded.', state: 'protected' },
-      ]} />,
+    element: <OrdersPage />,
   },
   {
     id: 'sales',

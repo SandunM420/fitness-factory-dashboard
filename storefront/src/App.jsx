@@ -5,6 +5,8 @@ import CataloguePage from './pages/CataloguePage.jsx';
 import InfoPage from './pages/InfoPage.jsx';
 import ProductPage from './pages/ProductPage.jsx';
 import CartPage from './pages/CartPage.jsx';
+import CheckoutPage from './pages/CheckoutPage.jsx';
+import AccountPage from './pages/AccountPage.jsx';
 import { addCartLine, CART_STORAGE_KEY, readCart, updateCartQuantity } from './cart.js';
 import { categoryBySlug } from './data/categories.js';
 import { getProducts } from './lib.js';
@@ -24,6 +26,7 @@ export default function App() {
   const addToCart = (item) => saveCart((current) => addCartLine(current, item));
   const updateQuantity = (key, quantity) => saveCart((current) => updateCartQuantity(current, key, quantity));
   const removeLine = (key) => saveCart((current) => updateCartQuantity(current, key, 0));
+  const clearCart = () => saveCart(() => []);
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   let page;
   if (path === '/') page = <HomePage products={products} />;
@@ -31,6 +34,8 @@ export default function App() {
   else if (path.startsWith('/category/')) page = <CataloguePage products={products} category={categoryBySlug.get(path.split('/')[2])?.name} />;
   else if (path.startsWith('/product/')) { const product = products.find((p) => path.endsWith(`-${encodeURIComponent(p.itemCode)}`)); page = <ProductPage product={product} products={products} onAdd={addToCart} />; }
   else if (path === '/cart') page = <CartPage cart={cart} products={products} catalogueLoaded={catalogueLoaded} onQuantity={updateQuantity} onRemove={removeLine} />;
+  else if (path === '/checkout') page = <CheckoutPage cart={cart} products={products} onComplete={clearCart} />;
+  else if (path === '/account') page = <AccountPage />;
   else if (['contact','faq','delivery','returns','privacy','terms'].includes(path.slice(1))) page = <InfoPage type={path.slice(1)} />;
   else page = <InfoPage type="faq" />;
   return <Layout theme={theme} setTheme={setTheme} cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}>{page}</Layout>;
