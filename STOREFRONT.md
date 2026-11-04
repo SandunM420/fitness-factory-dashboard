@@ -21,9 +21,9 @@ The storefront runs at `http://localhost:5174` and proxies `/api` to port 4000.
 
 ## Current milestone
 
-Implemented: responsive design system, dark-default/light theme, accessible shared header/navigation/footer, homepage, All Products, all six category routes, public catalogue reads, initial search/sort, provisional support/legal pages, and the reusable product-detail template with size/flavour selection, quantity, locally persisted Add to Cart action, merchandising content and related products.
+Implemented: responsive design system, dark-default/light theme, accessible shared header/navigation/footer, homepage, All Products, all six category routes, public catalogue reads, initial search/sort, provisional support/legal pages, the reusable product-detail template, and a production-quality persistent cart. Cart lines use stable product/size/flavour identifiers rather than cached product objects, merge duplicate selections, cap quantities at 10, revalidate price/availability against the live public catalogue, exclude unavailable lines from totals and block checkout until the customer resolves them.
 
-Next: full cart page, checkout, customer account/orders, final policy content, approved product imagery and end-to-end tests.
+Next: checkout and safe server-side order creation, customer account/orders, final policy content, approved product imagery and end-to-end tests.
 
 ## Product content and temporary imagery
 

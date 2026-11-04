@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from '../components/Link.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import { money } from '../lib.js';
@@ -9,6 +9,11 @@ export default function ProductPage({ product, products, onAdd }) {
   const [size, setSize] = useState(product?.sizes?.[0]?.id ?? '');
   const [flavour, setFlavour] = useState(product?.flavours?.[0]?.id ?? '');
   const [quantity, setQuantity] = useState(1);
+  useEffect(() => {
+    setSize(product?.sizes?.[0]?.id ?? '');
+    setFlavour(product?.flavours?.[0]?.id ?? '');
+    setQuantity(1);
+  }, [product?.itemCode]);
   const related = useMemo(() => products.filter((p) => p.itemCode !== product?.itemCode && p.category === product?.category).slice(0, 4), [product, products]);
   if (!product) return <section className="page section-pad narrow"><p className="eyebrow">Product</p><h1>Product not found</h1><p>This product may no longer be available.</p><Link className="button primary" href="/products">Browse products</Link></section>;
   const benefits = lines(product.benefits);
@@ -18,7 +23,7 @@ export default function ProductPage({ product, products, onAdd }) {
       <div className="product-buy"><p className="eyebrow">{product.brand} · {product.category}</p><h1>{product.title}</h1><p className="product-price">{money.format(product.price)}</p><p className="product-description">{product.description}</p>
         <fieldset><legend>Size / weight</legend><div className="choice-row">{product.sizes?.map((item) => <label key={item.id}><input type="radio" name="size" value={item.id} checked={String(size) === String(item.id)} onChange={() => setSize(item.id)} /><span>{item.label}</span></label>)}</div></fieldset>
         <fieldset><legend>Flavour</legend><div className="choice-row">{product.flavours?.map((item) => <label key={item.id}><input type="radio" name="flavour" value={item.id} checked={String(flavour) === String(item.id)} onChange={() => setFlavour(item.id)} /><span>{item.name}</span></label>)}</div></fieldset>
-        <div className="buy-row"><label>Quantity<input aria-label="Quantity" type="number" min="1" max="10" value={quantity} onChange={(e) => setQuantity(Math.min(10, Math.max(1, Number(e.currentTarget.value) || 1)))} /></label><button className="button primary" type="button" disabled={!product.inStock} onClick={() => onAdd({ product, size, flavour, quantity })}>{product.inStock ? 'Add to cart' : 'Out of stock'}</button></div>
+        <div className="buy-row"><label>Quantity<input aria-label="Quantity" type="number" min="1" max="10" value={quantity} onChange={(e) => setQuantity(Math.min(10, Math.max(1, Number(e.currentTarget.value) || 1)))} /></label><button className="button primary" type="button" disabled={!product.inStock} onClick={() => onAdd({ itemCode: product.itemCode, sizeId: size, flavourId: flavour, quantity })}>{product.inStock ? 'Add to cart' : 'Out of stock'}</button></div>
         <div className="trust-strip"><span>Islandwide delivery</span><span>Visa · Mastercard · Koko</span><span>Authentic products</span></div>
       </div>
     </section>
