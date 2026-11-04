@@ -11,6 +11,9 @@ const router = Router();
 
 // dbo.Stock column names, and the only values product_variants.location accepts.
 const LOCATIONS = ['HCM', 'One_Galle_Face', 'Hill_Street', 'Gym_Store'];
+const WEB_CATEGORIES = ['Protein', 'Creatine', 'Pre-Workouts', 'Fat Burners', 'Recovery', 'Accessories'];
+const PRODUCT_STATUSES = ['draft', 'active', 'archived'];
+const SIZE_UNITS = ['g', 'kg', 'lb', 'ml', 'L', 'capsules', 'tablets', 'servings', 'pieces', 'unit'];
 const wrap = (fn) => (req, res, next) => fn(req, res).catch(next);
 
 // SQLite constraint failures worth translating into something a manager can act on.
@@ -33,6 +36,94 @@ async function attempt(res, fn) {
 }
 
 const flavourById = async (id) => toRow(await get('SELECT * FROM flavours WHERE id = ?', id));
+
+const cleanText = (raw, max) => String(raw ?? '').trim().slice(0, max);
+const productExists = async (itemCode) => {
+  const result = await (await getPool()).request()
+    .input('code', sql.VarChar(40), itemCode)
+    .query('SELECT TOP 1 1 AS found FROM dbo.Stock WHERE RTRIM(itcode) = @code');
+  return Boolean(result.recordset[0]);
+};
+
+/* --------------------------------------------------------- website catalogue */
+
+router.patch('/products/:itemCode', wrap(async (req, res) => {
+  const itemCode = cleanText(req.params.itemCode, 40);
+  if (!itemCode || !(await productExists(itemCode))) return res.status(404).json({ error: 'POS product not found' });
+
+  const title = cleanText(req.body?.title, 160) || null;
+  const brand = cleanText(req.body?.brand, 100) || null;
+  const description = cleanText(req.body?.description, 4000) || null;
+  const category = req.body?.category ? cleanText(req.body.category, 40) : null;
+  const status = cleanText(req.body?.status || 'draft', 20).toLowerCase();
+  if (category && !WEB_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Pick an approved website category' });
+  if (!PRODUCT_STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid product status' });
+  if (status === 'active') {
+    if (!title || !brand || !category) return res.status(400).json({ error: 'Active products require a title, brand and website category' });
+    const { count } = await get('SELECT COUNT(*) AS count FROM product_sizes WHERE item_code = ? AND active = 1', itemCode);
+    if (!count) return res.status(400).json({ error: 'Add at least one active size before publishing this product' });
+  }
+
+  await run(`
+    INSERT INTO website_products (item_code, title, brand, category, description, status, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (item_code) DO UPDATE SET
+      title = excluded.title, brand = excluded.brand, category = excluded.category,
+      description = excluded.description, status = excluded.status, updated_at = excluded.updated_at`,
+  itemCode, title, brand, category, description, status, now());
+  return res.json({ product: toRow(await get('SELECT * FROM website_products WHERE item_code = ?', itemCode)) });
+}));
+
+const sizeById = async (id) => toRow(await get('SELECT * FROM product_sizes WHERE id = ?', id));
+const sizeInput = (body) => {
+  const label = cleanText(body?.label, 80);
+  const code = cleanText(body?.code, 16).toUpperCase();
+  const unit = cleanText(body?.unit || 'unit', 20);
+  const value = body?.value === '' || body?.value == null ? null : Number(body.value);
+  if (!label) return { error: 'Enter a size label' };
+  if (!/^[A-Z0-9]{1,16}$/.test(code)) return { error: 'Size code must be 1-16 letters or numbers' };
+  if (!SIZE_UNITS.includes(unit)) return { error: 'Pick a valid unit' };
+  if (value !== null && (!Number.isFinite(value) || value <= 0)) return { error: 'Size value must be greater than zero' };
+  return { label, code, unit, value, sort_order: Number(body?.sort_order) || 0 };
+};
+
+router.post('/products/:itemCode/sizes', wrap(async (req, res) => {
+  const itemCode = cleanText(req.params.itemCode, 40);
+  if (!itemCode || !(await productExists(itemCode))) return res.status(404).json({ error: 'POS product not found' });
+  const input = sizeInput(req.body);
+  if (input.error) return res.status(400).json({ error: input.error });
+  const result = await attempt(res, () => run(`
+    INSERT INTO product_sizes (item_code, label, value, unit, code, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?)`, itemCode, input.label, input.value, input.unit, input.code, input.sort_order));
+  if (!result) return;
+  return res.status(201).json({ size: await sizeById(result.lastInsertRowid) });
+}));
+
+router.patch('/sizes/:id', wrap(async (req, res) => {
+  const current = await sizeById(req.params.id);
+  if (!current) return res.status(404).json({ error: 'Size not found' });
+  const input = sizeInput({ ...current, ...req.body });
+  if (input.error) return res.status(400).json({ error: input.error });
+  if (input.code !== current.code) return res.status(400).json({ error: 'A size code cannot be changed once created' });
+  const active = req.body?.active === undefined ? current.active : Boolean(req.body.active);
+  const result = await attempt(res, () => run(`
+    UPDATE product_sizes SET label = ?, value = ?, unit = ?, active = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+  input.label, input.value, input.unit, active ? 1 : 0, input.sort_order, now(), req.params.id));
+  if (!result) return;
+  return res.json({ size: await sizeById(req.params.id) });
+}));
+
+router.delete('/sizes/:id', wrap(async (req, res) => {
+  const current = await sizeById(req.params.id);
+  if (!current) return res.status(404).json({ error: 'Size not found' });
+  const product = await get('SELECT status FROM website_products WHERE item_code = ?', current.item_code);
+  if (product?.status === 'active') {
+    const { count } = await get('SELECT COUNT(*) AS count FROM product_sizes WHERE item_code = ? AND active = 1', current.item_code);
+    if (current.active && count <= 1) return res.status(409).json({ error: 'An active product must keep at least one active size' });
+  }
+  if (!(await attempt(res, () => run('DELETE FROM product_sizes WHERE id = ?', req.params.id)))) return;
+  return res.status(204).end();
+}));
 
 /* ------------------------------------------------------------------ flavours */
 
@@ -143,19 +234,23 @@ const PRODUCTS_SQL = `
  */
 router.get('/products', wrap(async (req, res) => {
   // The POS and the app database are independent, so ask both at once.
-  const [posRows, variants, flavours] = await Promise.all([
+  const [posRows, variants, flavours, websiteProducts, sizes] = await Promise.all([
     getPool().then((pool) => pool.request().query(PRODUCTS_SQL)).then((r) => r.recordset),
     all('SELECT * FROM product_variants').then((rows) => rows.map(toRow)),
     all('SELECT * FROM flavours').then((rows) => rows.map(toRow)),
+    all('SELECT * FROM website_products').then((rows) => rows.map(toRow)),
+    all('SELECT * FROM product_sizes ORDER BY item_code, sort_order, label').then((rows) => rows.map(toRow)),
   ]);
 
   const flavourMap = new Map(flavours.map((f) => [f.id, f]));
+  const websiteMap = new Map(websiteProducts.map((p) => [p.item_code, p]));
   const byItem = new Map();
   const locations = new Set();
 
   for (const row of posRows) {
     locations.add(row.location);
     if (!byItem.has(row.itemCode)) {
+      const website = websiteMap.get(row.itemCode);
       byItem.set(row.itemCode, {
         itemCode: row.itemCode,
         itemName: row.itemName,
@@ -164,6 +259,8 @@ router.get('/products', wrap(async (req, res) => {
         cost: row.cost,
         pos: {},
         variants: [],
+        website: website ?? { item_code: row.itemCode, title: null, brand: null, category: null, description: null, status: 'draft' },
+        sizes: sizes.filter((size) => size.item_code === row.itemCode),
       });
     }
     byItem.get(row.itemCode).pos[row.location] = Number(row.qty) || 0;
@@ -207,6 +304,8 @@ router.get('/products', wrap(async (req, res) => {
     locations: [...locations].sort(),
     categories: [...new Set(products.map((p) => p.category))].sort(),
     flavours: flavours.filter((f) => f.active),
+    websiteCategories: WEB_CATEGORIES,
+    sizeUnits: SIZE_UNITS,
   });
 }));
 

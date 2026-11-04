@@ -8,6 +8,7 @@ import WebsiteStockPage from './WebsiteStockPage.jsx';
 import FlavoursPage from './FlavoursPage.jsx';
 import SubProductsPage from './SubProductsPage.jsx';
 import CommercePlaceholderPage from './CommercePlaceholderPage.jsx';
+import WebsiteCataloguePage from './WebsiteCataloguePage.jsx';
 
 /**
  * The whole admin menu lives here. To add a page:
@@ -58,6 +59,13 @@ export const MENU = [
     label: 'Products',
     icon: 'box',
     children: [
+      {
+        id: 'catalogue',
+        label: 'Website catalogue',
+        title: 'Website catalogue',
+        subtitle: 'Storefront content, approved categories and size/weight definitions',
+        element: <WebsiteCataloguePage />,
+      },
       {
         id: 'items',
         label: 'Items & prices',

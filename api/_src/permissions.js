@@ -21,6 +21,7 @@ export const PAGES = [
   { id: 'orders', label: 'Orders', group: 'Commerce' },
   { id: 'today', label: "Today's sales", group: 'Sales' },
   { id: 'items', label: 'Items & prices', group: 'Products', note: 'Shows cost prices and margins' },
+  { id: 'catalogue', label: 'Website catalogue', group: 'Products', note: 'Website content, categories and sizes' },
   { id: 'stock', label: 'Stock by location', group: 'Products' },
   { id: 'webstock', label: 'Website stock', group: 'Products', note: 'Split POS stock into flavours' },
   { id: 'subproducts', label: 'Sub-products', group: 'Products', note: 'Flat list of every flavour created' },
@@ -40,8 +41,8 @@ export const EDITABLE_ROLES = ['admin', 'manager', 'viewer'];
 
 /** Applied when the matrix has never been saved, tiered by how sensitive each page is. */
 export const DEFAULTS = {
-  admin: ['dashboard', 'orders', 'today', 'items', 'stock', 'webstock', 'subproducts', 'flavours', 'transfers', 'customers', 'discounts', 'content', 'store-settings'],
-  manager: ['dashboard', 'orders', 'today', 'stock', 'webstock', 'subproducts', 'flavours', 'transfers', 'customers'],
+  admin: ['dashboard', 'orders', 'today', 'items', 'catalogue', 'stock', 'webstock', 'subproducts', 'flavours', 'transfers', 'customers', 'discounts', 'content', 'store-settings'],
+  manager: ['dashboard', 'orders', 'today', 'catalogue', 'stock', 'webstock', 'subproducts', 'flavours', 'transfers', 'customers'],
   viewer: ['dashboard', 'today'],
 };
 

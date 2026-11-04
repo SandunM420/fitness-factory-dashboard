@@ -52,6 +52,33 @@ const SCHEMA = [
     active      INTEGER NOT NULL DEFAULT 1,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
   )`,
+  // Website-owned product content. The POS remains the authority for the base
+  // item, price and physical stock; these fields never write back to SQL Server.
+  `CREATE TABLE IF NOT EXISTS website_products (
+    item_code        TEXT PRIMARY KEY,
+    title            TEXT,
+    brand            TEXT,
+    category         TEXT CHECK (category IS NULL OR category IN ('Protein','Creatine','Pre-Workouts','Fat Burners','Recovery','Accessories')),
+    description      TEXT,
+    status           TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
+    updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+  )`,
+  // Size/weight belongs to the website catalogue because VinSim does not carry
+  // it. `code` becomes the stable SKU segment (for example 2LB or 500G).
+  `CREATE TABLE IF NOT EXISTS product_sizes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_code   TEXT NOT NULL,
+    label       TEXT NOT NULL,
+    value       REAL,
+    unit        TEXT NOT NULL CHECK (unit IN ('g','kg','lb','ml','L','capsules','tablets','servings','pieces','unit')),
+    code        TEXT NOT NULL,
+    active      INTEGER NOT NULL DEFAULT 1,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE (item_code, code)
+  )`,
+  'CREATE INDEX IF NOT EXISTS product_sizes_item_idx ON product_sizes (item_code, sort_order)',
   // One row per (POS product x flavour x location); see catalog.js.
   `CREATE TABLE IF NOT EXISTS product_variants (
     item_code       TEXT NOT NULL,

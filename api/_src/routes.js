@@ -49,7 +49,7 @@ const requirePage = (...pageIds) => (req, res, next) => {
 };
 
 // Mounted after requirePage is defined - a const is not hoisted.
-router.use('/catalog', requirePage('webstock', 'subproducts', 'flavours'), catalogRoutes);
+router.use('/catalog', requirePage('catalogue', 'webstock', 'subproducts', 'flavours'), catalogRoutes);
 
 // List metric definitions (without SQL), limited to pages the caller may open.
 router.get('/metrics', wrap(async (req, res) => {
