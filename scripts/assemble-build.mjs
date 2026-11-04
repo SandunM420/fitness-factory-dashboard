@@ -1,5 +1,9 @@
 import { cp, mkdir, rm } from 'node:fs/promises';
-await rm('dist', { recursive: true, force: true });
-await mkdir('dist/admin', { recursive: true });
-await cp('storefront/dist', 'dist', { recursive: true });
-await cp('web/dist', 'dist/admin', { recursive: true });
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const output = path.join(root, 'dist');
+await rm(output, { recursive: true, force: true });
+await mkdir(path.join(output, 'admin'), { recursive: true });
+await cp(path.join(root, 'storefront/dist'), output, { recursive: true });
+await cp(path.join(root, 'web/dist'), path.join(output, 'admin'), { recursive: true });
