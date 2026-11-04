@@ -477,6 +477,27 @@ These were found by checking the live data. Each one produces wrong numbers if y
 
 ## Known issues / TODO
 
+### Temporary storefront demo catalogue
+
+The preview catalogue can be populated with exactly 12 clearly marked demo records (two in each approved website category) using `scripts/seed-demo-products.mjs`. The script writes only to the website-owned catalogue, merchandising, size, flavour and variant tables. It validates the selected item codes and available HCM quantities against the read-only POS database, refuses to replace active non-demo products, and refuses to run when `ENABLE_EXPLORER=true`.
+
+Load the same server-side environment used by the API, then use:
+
+```sh
+npm run catalogue:demo:dry-run
+npm run catalogue:demo:apply
+```
+
+Every generated description begins with `[DEMO-CATALOG-2026]`, product names and artwork say `Demo`, and the local SVG files in `storefront/public/demo-products` are original temporary illustrations rather than official packshots. Staff can edit, archive or delete these records through `/admin` because the storefront reads the normal admin-managed tables.
+
+To safely remove the complete demo set and any now-unused demo flavours without touching POS or other catalogue records:
+
+```sh
+npm run catalogue:demo:remove
+```
+
+Replace the demo records with verified product names, packshots, ingredients, usage, allergen/safety text, variants and prices before accepting real orders.
+
 - **Returns not subtracted:** `Crn` credit notes are left out of revenue figures.
 - **Stock location columns:** the meaning of the per-location columns in `Stock` (`HCM`, `One_Galle_Face`, …) is inferred and not yet confirmed.
 - **Explorer paging:** tables without a primary key are sorted by all their sortable columns to keep pages stable. This can be slow on very large tables.
