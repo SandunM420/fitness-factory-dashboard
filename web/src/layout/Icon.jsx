@@ -1,5 +1,6 @@
 import {
-  IconChartLine, IconDatabase, IconFile, IconLayoutDashboard, IconPackage, IconSettings, IconUsers,
+  IconArrowsExchange, IconChartLine, IconClipboardList, IconDatabase, IconDiscount2,
+  IconFile, IconLayoutDashboard, IconPackage, IconSettings, IconShoppingBag, IconUsers,
 } from '@tabler/icons-react';
 
 // Menu icon names used in pages/registry.jsx, mapped to Tabler icons
@@ -11,6 +12,11 @@ const ICONS = {
   box: IconPackage,
   users: IconUsers,
   settings: IconSettings,
+  orders: IconShoppingBag,
+  transfers: IconArrowsExchange,
+  customers: IconUsers,
+  discounts: IconDiscount2,
+  content: IconClipboardList,
   page: IconFile,
 };
 

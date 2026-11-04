@@ -18,12 +18,18 @@ export const explorerEnabled = process.env.ENABLE_EXPLORER === 'true';
 /** Every page a role can be granted. `group` only affects how the matrix is drawn. */
 export const PAGES = [
   { id: 'dashboard', label: 'Dashboard', group: 'Dashboard' },
+  { id: 'orders', label: 'Orders', group: 'Commerce' },
   { id: 'today', label: "Today's sales", group: 'Sales' },
   { id: 'items', label: 'Items & prices', group: 'Products', note: 'Shows cost prices and margins' },
   { id: 'stock', label: 'Stock by location', group: 'Products' },
   { id: 'webstock', label: 'Website stock', group: 'Products', note: 'Split POS stock into flavours' },
   { id: 'subproducts', label: 'Sub-products', group: 'Products', note: 'Flat list of every flavour created' },
   { id: 'flavours', label: 'Flavours', group: 'Products', note: 'Master flavour list' },
+  { id: 'transfers', label: 'Transfers', group: 'Commerce', note: 'Transfer and invoice queue' },
+  { id: 'customers', label: 'Customers', group: 'Commerce', note: 'Contains personal information' },
+  { id: 'discounts', label: 'Discounts', group: 'Commerce' },
+  { id: 'content', label: 'Content', group: 'Storefront' },
+  { id: 'store-settings', label: 'Store settings', group: 'Settings', note: 'Operational configuration' },
   { id: 'explorer', label: 'Data explorer', group: 'Data explorer', note: 'Raw access to every POS table' },
 ].filter((page) => page.id !== 'explorer' || explorerEnabled);
 
@@ -34,8 +40,8 @@ export const EDITABLE_ROLES = ['admin', 'manager', 'viewer'];
 
 /** Applied when the matrix has never been saved, tiered by how sensitive each page is. */
 export const DEFAULTS = {
-  admin: ['dashboard', 'today', 'items', 'stock', 'webstock', 'subproducts', 'flavours'],
-  manager: ['dashboard', 'today', 'stock', 'webstock', 'subproducts', 'flavours'],
+  admin: ['dashboard', 'orders', 'today', 'items', 'stock', 'webstock', 'subproducts', 'flavours', 'transfers', 'customers', 'discounts', 'content', 'store-settings'],
+  manager: ['dashboard', 'orders', 'today', 'stock', 'webstock', 'subproducts', 'flavours', 'transfers', 'customers'],
   viewer: ['dashboard', 'today'],
 };
 

@@ -7,6 +7,7 @@ import UsersPage from './UsersPage.jsx';
 import WebsiteStockPage from './WebsiteStockPage.jsx';
 import FlavoursPage from './FlavoursPage.jsx';
 import SubProductsPage from './SubProductsPage.jsx';
+import CommercePlaceholderPage from './CommercePlaceholderPage.jsx';
 
 /**
  * The whole admin menu lives here. To add a page:
@@ -18,21 +19,25 @@ import SubProductsPage from './SubProductsPage.jsx';
  */
 export const MENU = [
   {
-    id: 'users',
-    label: 'Users',
-    icon: 'users',
-    title: 'User management',
-    subtitle: 'Invite users and control account access',
-    allowedRoles: ['super_admin'],
-    element: <UsersPage />,
+    id: 'dashboard',
+    label: 'Overview',
+    icon: 'dashboard',
+    title: 'Commerce overview',
+    subtitle: 'Sales, stock and operational signals across every location',
+    element: <DashboardPage />,
   },
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: 'dashboard',
-    title: 'Dashboard',
-    subtitle: 'Key numbers across both shops',
-    element: <DashboardPage />,
+    id: 'orders',
+    label: 'Orders',
+    icon: 'orders',
+    title: 'Online orders',
+    subtitle: 'Review payments, reserve exact variants and move accepted orders into transfer',
+    element: <CommercePlaceholderPage title="Online orders" description="The order workspace will protect exact flavour-and-weight reservations from payment through delivery."
+      items={[
+        { title: 'New and paid orders', text: 'A prioritised queue with payment, acceptance and fulfilment states.', state: 'planned' },
+        { title: 'Variant reservations', text: 'Reserved units remain unavailable to other customers.', state: 'protected' },
+        { title: 'Immutable timeline', text: 'Every staff, payment, stock and delivery event is recorded.', state: 'protected' },
+      ]} />,
   },
   {
     id: 'sales',
@@ -87,6 +92,87 @@ export const MENU = [
         title: 'Flavours',
         subtitle: 'The master flavour list used by the website stock page',
         element: <FlavoursPage />,
+      },
+    ],
+  },
+  {
+    id: 'transfers',
+    label: 'Transfers',
+    icon: 'transfers',
+    title: 'Transfer queue',
+    subtitle: 'Move accepted online orders from mall stock to the website fulfilment location',
+    element: <CommercePlaceholderPage title="Transfer queue" description="Accepted orders remain counted against source stock until their VinSim transfer and invoice references are reconciled."
+      items={[
+        { title: 'Transfer required', text: 'Accepted orders waiting for a VinSim transfer note.', state: 'planned' },
+        { title: 'Invoice confirmation', text: 'Record and verify the destination-location invoice.', state: 'protected' },
+        { title: 'Reconciliation exceptions', text: 'Find missing references and stock mismatches before fulfilment.', state: 'protected' },
+      ]} />,
+  },
+  {
+    id: 'customers',
+    label: 'Customers',
+    icon: 'customers',
+    title: 'Customers',
+    subtitle: 'Orders, addresses, consent and support context with role-aware privacy',
+    element: <CommercePlaceholderPage title="Customers" description="A privacy-aware customer workspace will keep order history useful without exposing more personal data than each role needs."
+      items={[
+        { title: 'Customer profiles', text: 'Contact, addresses and order history in one operational view.', state: 'planned' },
+        { title: 'Consent records', text: 'Marketing choices remain separate from transactional communication.', state: 'protected' },
+        { title: 'Role-aware masking', text: 'Sensitive values are hidden when a staff role does not require them.', state: 'protected' },
+      ]} />,
+  },
+  {
+    id: 'discounts',
+    label: 'Discounts',
+    icon: 'discounts',
+    title: 'Discounts',
+    subtitle: 'Controlled codes and automatic offers with eligibility and usage limits',
+    element: <CommercePlaceholderPage title="Discounts" description="Promotion rules will be previewable, time-bound and protected against unintended combinations."
+      items={[
+        { title: 'Discount codes', text: 'Usage, dates, minimums and eligible products.', state: 'planned' },
+        { title: 'Automatic offers', text: 'Apply qualified promotions without manual codes.', state: 'planned' },
+        { title: 'Rule preview', text: 'Show the effect before a promotion becomes active.', state: 'protected' },
+      ]} />,
+  },
+  {
+    id: 'content',
+    label: 'Content',
+    icon: 'content',
+    title: 'Storefront content',
+    subtitle: 'Homepage sections, navigation, FAQs and required policy content',
+    element: <CommercePlaceholderPage title="Storefront content" description="Staff can maintain essential storefront information without changing code. The five pages removed from scope are not included."
+      items={[
+        { title: 'Homepage sections', text: 'Manage hero, featured categories and selected product groups.', state: 'planned' },
+        { title: 'Navigation', text: 'Maintain All Products and the six approved category links.', state: 'planned' },
+        { title: 'Support content', text: 'Contact, FAQ, shipping, returns and legal copy.', state: 'planned' },
+      ]} />,
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: 'settings',
+    title: 'Settings and access',
+    subtitle: 'Locations, markets, delivery, staff roles and security controls',
+    children: [
+      {
+        id: 'store-settings',
+        label: 'Store settings',
+        title: 'Store settings',
+        subtitle: 'Website fulfilment, checkout and operational configuration',
+        element: <CommercePlaceholderPage title="Store settings" description="Configuration will be separated by responsibility so operational staff cannot alter security or payment settings accidentally."
+          items={[
+            { title: 'Locations', text: 'Source malls and the approved website fulfilment destination.', state: 'planned' },
+            { title: 'Checkout and delivery', text: 'Currencies, shipping services and order rules.', state: 'planned' },
+            { title: 'Security', text: 'Sessions, audit trail and protected integration configuration.', state: 'protected' },
+          ]} />,
+      },
+      {
+        id: 'users',
+        label: 'Staff and permissions',
+        title: 'Staff and permissions',
+        subtitle: 'Invite users and control account access',
+        allowedRoles: ['super_admin'],
+        element: <UsersPage />,
       },
     ],
   },

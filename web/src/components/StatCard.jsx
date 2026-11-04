@@ -8,8 +8,8 @@ import { Paper, Text, UnstyledButton } from '@mantine/core';
 export default function StatCard({ label, value, hint, active, onClick, children }) {
   const body = (
     <Paper p="md" h="100%" style={{
-      borderLeft: `4px solid var(--mantine-color-blue-${active ? 4 : 6})`,
-      background: active ? 'var(--mantine-color-blue-light)' : undefined,
+      borderLeft: `4px solid var(--mantine-color-orange-${active ? 4 : 6})`,
+      background: active ? 'var(--mantine-color-orange-light)' : undefined,
     }}>
       <Text size="xs" c="dimmed" tt="uppercase" fw={600} lts={0.5}>{label}</Text>
       <Text fz={30} fw={700} style={{ fontVariantNumeric: 'tabular-nums' }} lh={1.3}>{value}</Text>

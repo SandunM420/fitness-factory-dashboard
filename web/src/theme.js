@@ -1,18 +1,18 @@
 import { createTheme } from '@mantine/core';
 
-// The app's colours, fonts and radii. The app is always dark; change the look
-// here rather than in individual components.
+// Shared commerce-admin design tokens. Dark is the initial scheme, but staff
+// can switch to light mode from the header and Mantine persists their choice.
 //   dark[7] = --bg, dark[6] = --card, dark[4] = --border, dark[2] = --muted, dark[0] = --text
 export const theme = createTheme({
-  primaryColor: 'blue',
+  primaryColor: 'orange',
   primaryShade: { dark: 6 },   // blue[6] = --accent-button
-  fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+  fontFamily: 'Poppins, system-ui, -apple-system, Segoe UI, sans-serif',
+  headings: { fontFamily: 'Poppins, system-ui, -apple-system, Segoe UI, sans-serif', fontWeight: '600' },
   defaultRadius: 'md',
   colors: {
-    // blue[4] = --accent-strong, blue[5] = --accent, blue[6] = --accent-button
-    blue: [
-      '#eff6ff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa',
-      '#3b82f6', '#2563eb', '#1d4ed8', '#1e40af', '#1e3a8a',
+    orange: [
+      '#fff4ed', '#ffe5d5', '#ffc8a9', '#ffa376', '#ff7a3f',
+      '#f45d22', '#df4216', '#ba3012', '#942812', '#782313',
     ],
     dark: [
       '#f5f7fa', '#c9cfd6', '#9aa3ae', '#5c6570', '#262b33',

@@ -5,8 +5,8 @@ import { visibleMenu } from '../pages/registry.jsx';
 export function Brand({ collapsed }) {
   return (
     <Group gap="sm" wrap="nowrap" h={64} px="md" style={{ borderBottom: '1px solid var(--mantine-color-dark-4)' }}>
-      <ThemeIcon size={32} radius="md" fw={800} fz="sm">FF</ThemeIcon>
-      {!collapsed && <Text fw={700} style={{ whiteSpace: 'nowrap' }}>Fitness Factory</Text>}
+      <ThemeIcon size={32} radius="md" fw={800} fz="sm" color="orange">FF</ThemeIcon>
+      {!collapsed && <div><Text fw={700} c="white" style={{ whiteSpace: 'nowrap' }}>Fitness Factory</Text><Text fz={9} c="dark.2" tt="uppercase" lts={1.4}>Commerce admin</Text></div>}
     </Group>
   );
 }
@@ -28,7 +28,7 @@ export default function Sidebar({ current, parentId, collapsed, onNavigate, user
             <UnstyledButton onClick={() => target && onNavigate(target)} aria-label={item.label}
               w={44} h={44} style={{
                 display: 'grid', placeItems: 'center', borderRadius: 'var(--mantine-radius-md)',
-                background: active ? 'var(--mantine-color-blue-6)' : undefined,
+                background: active ? 'var(--mantine-color-orange-6)' : undefined,
                 color: active ? 'white' : 'var(--mantine-color-dark-1)',
               }}>
               <Icon name={item.icon} />
@@ -44,7 +44,7 @@ export default function Sidebar({ current, parentId, collapsed, onNavigate, user
                 <Menu.Label>{item.label}</Menu.Label>
                 {item.children.map((child) => (
                   <Menu.Item key={child.id} onClick={() => onNavigate(child.id)}
-                    c={current === child.id ? 'blue.4' : undefined}>{child.label}</Menu.Item>
+                    c={current === child.id ? 'orange.4' : undefined}>{child.label}</Menu.Item>
                 ))}
               </Menu.Dropdown>
             </Menu>
@@ -71,7 +71,7 @@ export default function Sidebar({ current, parentId, collapsed, onNavigate, user
             onClick={() => target && onNavigate(target)}
             aria-current={active && current === item.id ? 'page' : undefined}
             fw={active ? 600 : undefined}
-            c={active && hasChildren ? 'blue.4' : undefined}
+            c={active && hasChildren ? 'orange.4' : undefined}
             style={{ borderRadius: 'var(--mantine-radius-md)' }}
             mb={2}
           >

@@ -1,13 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
 /* App-wide rules that Mantine's theme (theme.js) does not cover. Everything
    else is styled with Mantine components and their props. */
 
 /* Cards sit one shade above the page background. */
-.mantine-Paper-root { background-color: var(--mantine-color-dark-6); }
-.mantine-Modal-content, .mantine-Modal-header { background-color: var(--mantine-color-dark-6); }
+[data-mantine-color-scheme='dark'] .mantine-Paper-root { background-color: var(--mantine-color-dark-6); }
+[data-mantine-color-scheme='dark'] .mantine-Modal-content,
+[data-mantine-color-scheme='dark'] .mantine-Modal-header { background-color: var(--mantine-color-dark-6); }
 
 /* Clickable cards (stock tiles, shop cards, category leaders). */
 .hover-lift { transition: border-color 0.15s ease, transform 0.15s ease; }
-.hover-lift:hover { border-color: var(--mantine-color-blue-6); transform: translateY(-1px); }
+.hover-lift:hover { border-color: var(--mantine-color-orange-6); transform: translateY(-1px); }
 
 /* Recharts draws a focus box around a clicked chart; it adds nothing here. */
 .recharts-wrapper *:focus { outline: none; }

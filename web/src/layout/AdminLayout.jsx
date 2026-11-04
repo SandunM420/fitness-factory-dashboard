@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActionIcon, AppShell, Box, Burger, Button, Code, Group, Paper, Text, Title, Tooltip } from '@mantine/core';
-import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout } from '@tabler/icons-react';
+import { ActionIcon, AppShell, Box, Burger, Button, Code, Group, Paper, Text, Title, Tooltip, useMantineColorScheme } from '@mantine/core';
+import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconLogout, IconMoon, IconSun } from '@tabler/icons-react';
 import Sidebar, { Brand } from './Sidebar.jsx';
 
 const STORAGE_KEY = 'ff.sidebar.collapsed';
@@ -9,6 +9,7 @@ const readCollapsed = () => {
 };
 
 export default function AdminLayout({ current, parentId, page, onNavigate, user, onSignOut }) {
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -25,8 +26,8 @@ export default function AdminLayout({ current, parentId, page, onNavigate, user,
       navbar={{ width: collapsed ? 64 : 240, breakpoint: 'sm', collapsed: { mobile: !mobileOpen } }}
       padding="lg"
       styles={{
-        navbar: { background: 'var(--mantine-color-dark-8)', transition: 'width 0.18s ease' },
-        header: { background: 'var(--mantine-color-dark-7)' },
+        navbar: { background: 'var(--mantine-color-dark-8)', color: 'var(--mantine-color-dark-0)', transition: 'width 0.18s ease' },
+        header: { background: colorScheme === 'dark' ? 'var(--mantine-color-dark-7)' : 'var(--mantine-color-white)' },
       }}
     >
       <AppShell.Navbar>
@@ -58,6 +59,12 @@ export default function AdminLayout({ current, parentId, page, onNavigate, user,
             {page?.subtitle && <Text size="xs" c="dimmed" lineClamp={1} visibleFrom="xs">{page.subtitle}</Text>}
           </Box>
           <Text size="sm" c="dimmed" visibleFrom="md" title={`${user.email} (${user.role})`}>{user.email}</Text>
+          <Tooltip label={colorScheme === 'dark' ? 'Use light mode' : 'Use dark mode'}>
+            <ActionIcon variant="default" size="lg" onClick={() => setColorScheme(colorScheme === 'dark' ? 'light' : 'dark')}
+              aria-label={colorScheme === 'dark' ? 'Use light mode' : 'Use dark mode'}>
+              {colorScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+            </ActionIcon>
+          </Tooltip>
           <Button variant="default" size="sm" onClick={onSignOut} leftSection={<IconLogout size={16} />}>
             <Box component="span" visibleFrom="xs">Sign out</Box>
           </Button>
