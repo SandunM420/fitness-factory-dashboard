@@ -44,6 +44,8 @@ function statementsFor(product, flavourIds) {
   const updated = new Date().toISOString();
   const [label, value, unit, code] = product.size;
   const rows = [
+    { sql: `UPDATE product_sizes SET active=0,updated_at=? WHERE item_code=?`, args: [updated, product.itemCode] },
+    { sql: `UPDATE product_variants SET active=0,visible_on_web=0,updated_at=? WHERE item_code=?`, args: [updated, product.itemCode] },
     { sql: `INSERT INTO website_products (item_code,title,brand,category,description,status,updated_at) VALUES (?,?,?,?,?,'active',?) ON CONFLICT(item_code) DO UPDATE SET title=excluded.title,brand=excluded.brand,category=excluded.category,description=excluded.description,status='active',updated_at=excluded.updated_at`, args: [product.itemCode, product.title, product.brand, product.category, `${DEMO_MARKER} ${product.description}`, updated] },
     { sql: `INSERT INTO product_merchandising (item_code,image_url,benefits,ingredients,usage,warnings,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(item_code) DO UPDATE SET image_url=excluded.image_url,benefits=excluded.benefits,ingredients=excluded.ingredients,usage=excluded.usage,warnings=excluded.warnings,updated_at=excluded.updated_at`, args: [product.itemCode, product.image, product.benefits, product.ingredients, product.usage, product.warnings, updated] },
     { sql: `INSERT INTO product_sizes (item_code,label,value,unit,code,active,sort_order,updated_at) VALUES (?,?,?,?,?,1,0,?) ON CONFLICT(item_code,code) DO UPDATE SET label=excluded.label,value=excluded.value,unit=excluded.unit,active=1,sort_order=0,updated_at=excluded.updated_at`, args: [product.itemCode, label, value, unit, code, updated] },
