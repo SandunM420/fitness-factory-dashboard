@@ -498,6 +498,14 @@ npm run catalogue:demo:remove
 
 Replace the demo records with verified product names, packshots, ingredients, usage, allergen/safety text, variants and prices before accepting real orders.
 
+### Storefront campaign media
+
+The homepage media in `storefront/public/media` came from the Agency Intern handoff on 2026-11-05. It includes one hero poster, one 12-second H.264 hero loop and one square image for each of the six approved categories. The original JPG files are retained as fallbacks; WebP derivatives are used where supported. The source handoff remains unchanged outside this repository.
+
+The hero always has a 1376×768 poster. Its muted loop is progressively enabled only when the visitor has not requested reduced motion or data saving. Category images have explicit 1024×1024 dimensions and lazy loading. When final campaign photography is approved, replace both the JPG and matching WebP file while keeping these names and dimensions, and replace the MP4 without changing its codec or aspect ratio unless the component is updated at the same time.
+
+These assets are homepage/category navigation artwork, not verified product packshots. Demo product cards intentionally continue using the clearly labelled temporary SVG artwork in `storefront/public/demo-products` until real products and supplier-approved images are entered through `/admin`.
+
 - **Returns not subtracted:** `Crn` credit notes are left out of revenue figures.
 - **Stock location columns:** the meaning of the per-location columns in `Stock` (`HCM`, `One_Galle_Face`, …) is inferred and not yet confirmed.
 - **Explorer paging:** tables without a primary key are sorted by all their sortable columns to keep pages stable. This can be slow on very large tables.
