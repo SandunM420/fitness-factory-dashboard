@@ -1,10 +1,10 @@
 import Link from './Link.jsx';
 import { money, productHref } from '../lib.js';
 
-export default function ProductCard({ product }) {
+export default function ProductCard({ product, priority = false }) {
   return <article className="product-card">
     <Link className="product-visual" href={productHref(product)} aria-label={`View ${product.title}`}>
-      {product.imageUrl ? <img src={product.imageUrl} alt="" loading="lazy" width="480" height="560" /> : <span>{product.brand?.slice(0, 2) || 'FF'}</span>}
+      {product.imageUrl ? <img src={product.imageUrl} alt="" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'auto'} decoding="async" width="1000" height="1000" /> : <span>{product.brand?.slice(0, 2) || 'FF'}</span>}
       {product.inStock ? <em>In stock</em> : <em className="out">Out of stock</em>}
     </Link>
     <p className="eyebrow">{product.brand}</p>

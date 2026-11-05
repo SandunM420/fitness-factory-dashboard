@@ -23,13 +23,15 @@ The storefront runs at `http://localhost:5174` and proxies `/api` to port 4000.
 
 Implemented: responsive design system, dark-default/light theme, accessible shared header/navigation/footer, homepage, All Products, all six category routes, public catalogue reads, initial search/sort, provisional support/legal pages, the reusable product-detail template, and a production-quality persistent cart. Cart lines use stable product/size/flavour identifiers rather than cached product objects, merge duplicate selections, cap quantities at 10, revalidate price/availability against the live public catalogue, exclude unavailable lines from totals and block checkout until the customer resolves them.
 
-Next: checkout and safe server-side order creation, customer account/orders, final policy content, approved product imagery and end-to-end tests.
+Current preview: checkout and safe server-side order creation, customer account/orders, 12 editable demo catalogue records, approved campaign media and 12 optimized transparent packshots are implemented. Final policy content, payment-provider hand-off and verified supplier label copy are still required before real sales.
 
 ## Product content and temporary imagery
 
 Product title, brand, category, description, sizes, image URL, benefits, ingredients, usage and warnings are maintained in the authenticated Website Catalogue admin page. Only active products reach the public read-only API. Exact quantities, stock locations, costs, credentials and admin session data never reach the storefront.
 
-The product detail template deliberately shows a labelled temporary placeholder when no image has been entered. Admin image URLs must be HTTPS or a local `/` path. Replace every placeholder or temporary third-party image through the admin portal with approved product photography before launch; no temporary image is treated as a final brand asset.
+The product detail template deliberately shows a labelled temporary placeholder when no image has been entered. Admin image URLs must be HTTPS or a local `/` path. The preview catalogue uses stable `/product-packshots/<ITEM_CODE>.webp` paths from `storefront/public/product-packshots/`; `provenance.csv` and its README document the manufacturer sources and replacement process. Product cards and detail pages use contain-style rendering and consistent padding so transparent cutouts keep their proportions. Catalogue images below the first row are lazy-loaded.
+
+The demo seed keeps the `[DEMO-CATALOG-2026]` marker in each description, refuses to overwrite non-demo active catalogue records, and can be reversed with `npm run catalogue:demo:remove`. It writes only to the app-owned website catalogue, merchandising, size and variant tables; VinSim/POS is validated read-only and is never written.
 
 ## Safety and launch
 

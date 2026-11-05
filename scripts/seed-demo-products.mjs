@@ -20,6 +20,26 @@ const products = [
   { itemCode: 'ACC003', title: 'Demo Everyday Shaker Cup', brand: 'Prototype Gear', category: 'Accessories', price: 2200, image: '/demo-products/accessories.svg', size: ['600 ml', 600, 'ml', '600ML'], flavours: [['Demo Smoke', 'DSMOKE'], ['Demo Clear', 'DCLEAR']], description: 'Temporary basic shaker sample for the Accessories catalogue.', benefits: 'Sample copy: compact size; simple mixing insert; leak-resistant demonstration design.', ingredients: 'Sample material: food-contact plastic. Final specification pending supplier confirmation.', usage: 'Sample usage: hand-wash before first use and check the lid is fully closed.', warnings: 'DEMO ONLY. Replace care and safety details with the verified manufacturer instructions.' },
 ];
 
+// Approved manufacturer packshots and the matching visible catalogue identity.
+// Descriptions and label copy remain explicitly marked as preview content until
+// Fitness Factory replaces them through the authenticated catalogue editor.
+const approvedProductIdentity = {
+  PRT010: { title: 'Applied Nutrition ISO-XP 850g 34 Servings', brand: 'Applied Nutrition', image: '/product-packshots/PRT010.webp', size: ['850 g', 850, 'g', '850G'], flavours: [['Chocolate Dessert', 'CHOC-DESSERT']] },
+  PRT034: { title: 'Applied Nutrition ISO-XP 1 Kg 40 Servings', brand: 'Applied Nutrition', image: '/product-packshots/PRT034.webp', size: ['1 kg', 1, 'kg', '1KG'], flavours: [['Vanilla', 'VANILLA']] },
+  CRT002: { title: 'Applied Nutrition Creatine Monohydrate 50 Servings', brand: 'Applied Nutrition', image: '/product-packshots/CRT002.webp', size: ['250 g / 50 servings', 250, 'g', '250G'], flavours: [['Unflavoured', 'UNFLAVOURED']] },
+  CRT012: { title: 'Applied Nutrition Flavored Creatine 50 Servings', brand: 'Applied Nutrition', image: '/product-packshots/CRT012.webp', size: ['250 g / 50 servings', 250, 'g', '250G'], flavours: [['Cherry & Apple', 'CHERRY-APPLE']] },
+  PWO005: { title: 'BSN N.O.-Xplode 30 Servings', brand: 'BSN', image: '/product-packshots/PWO005.webp', size: ['30 servings', 30, 'servings', '30SRV'], flavours: [['Blue Raz', 'BLUE-RAZ']] },
+  PWO020: { title: 'REDCON1 Total War 30 Servings', brand: 'REDCON1', image: '/product-packshots/PWO020.webp', size: ['30 servings', 30, 'servings', '30SRV'], flavours: [['Tropical Snow Cone', 'TROP-SNOW']] },
+  FTB003: { title: 'MuscleTech Hydroxycut 100 Caps', brand: 'MuscleTech', image: '/product-packshots/FTB003.webp', size: ['100 capsules', 100, 'capsules', '100CAP'], flavours: [['Unflavoured', 'UNFLAVOURED']] },
+  FTB004: { title: 'Nutrex Lipo-6 60 Caps', brand: 'Nutrex Research', image: '/product-packshots/FTB004.webp', size: ['60 capsules', 60, 'capsules', '60CAP'], flavours: [['Unflavoured', 'UNFLAVOURED']] },
+  RCV005: { title: 'Scivation XTEND 30 Servings', brand: 'XTEND', image: '/product-packshots/RCV005.webp', size: ['30 servings', 30, 'servings', '30SRV'], flavours: [['Blue Raspberry Ice', 'BLUE-RASP']] },
+  PRT035: { title: 'NoXcuses Protein Bar', brand: 'NoXcuses', image: '/product-packshots/PRT035.webp', size: ['Protein bar', 1, 'unit', '1BAR'], flavours: [['Nut & Honey', 'NUT-HONEY']] },
+  ACC003: { title: 'Shaker Cup', brand: 'Applied Nutrition', image: '/product-packshots/ACC003.webp', size: ['600 ml', 600, 'ml', '600ML'], flavours: [['Black', 'BLACK']] },
+  ACC006: { title: 'Shaker 3-in-1', brand: 'Applied Nutrition', image: '/product-packshots/ACC006.webp', size: ['700 ml', 700, 'ml', '700ML'], flavours: [['Black', 'BLACK']] },
+};
+
+products.forEach((product) => Object.assign(product, approvedProductIdentity[product.itemCode]));
+
 function statementsFor(product, flavourIds) {
   const updated = new Date().toISOString();
   const [label, value, unit, code] = product.size;

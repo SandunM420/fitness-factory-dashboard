@@ -32,3 +32,8 @@
 .category-card:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 @media(max-width:1080px){.hero-media{min-height:0}}
 @media(prefers-reduced-motion:reduce){.hero-media video{display:none}.category-card img{transition:none}}
+
+/* Approved square packshots: preserve the cutout and keep every product aligned. */
+.product-visual{padding:clamp(14px,2.2vw,30px)}
+.product-visual img{object-fit:contain}
+.product-gallery{padding:clamp(24px,5vw,72px)}
