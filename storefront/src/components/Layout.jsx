@@ -8,7 +8,7 @@ export default function Layout({ children, theme, setTheme, cartCount }) {
     <a className="skip-link" href="#main">Skip to content</a>
     <div className="announcement">Islandwide delivery <span /> Authentic products <span /> Secure checkout</div>
     <header className="header">
-      <Link className="logo" href="/" aria-label="Fitness Factory home"><b>FITNESS</b><i>FACTORY</i></Link>
+      <Link className="logo" href="/"><b>FITNESS</b><i>FACTORY</i></Link>
       <button className="icon-button menu-button" type="button" aria-expanded={open} aria-controls="site-nav" onClick={() => setOpen(!open)}><span className="sr-only">Menu</span>☰</button>
       <nav id="site-nav" className={open ? 'nav open' : 'nav'} aria-label="Main navigation">
         <Link href="/products" onClick={() => setOpen(false)}>All Products</Link>
@@ -21,7 +21,7 @@ export default function Layout({ children, theme, setTheme, cartCount }) {
         <Link className="cart-link" href="/cart">Bag <span>{cartCount}</span></Link>
       </div>
     </header>
-    <main id="main">{children}</main>
+    <main id="main" tabIndex="-1">{children}</main>
     <footer className="footer">
       <div><Link className="logo" href="/"><b>FITNESS</b><i>FACTORY</i></Link><p>Premium sports nutrition and training essentials, selected for Sri Lanka.</p></div>
       <div><h2>Shop</h2><Link href="/products">All products</Link>{categories.slice(0, 4).map((c) => <Link key={c.slug} href={`/category/${c.slug}`}>{c.name}</Link>)}</div>

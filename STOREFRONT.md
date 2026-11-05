@@ -56,3 +56,32 @@ The protected `/admin` order workspace lists reservations and allows operational
 - Privacy retention/contact details
 - Terms, merchant identity and dispute language
 - Approved payment provider credentials and webhook verification
+
+## Cinematic performance and accessibility
+
+The homepage uses one brand-specific campaign composition: a strong training image, restrained orange depth cues and the approved goal-led category imagery. Product discovery receives the visual treatment; cart, checkout, account and admin remain intentionally calm and task-focused. No GetLayers assets, copy or distinctive layouts are reproduced.
+
+The hero image is always the semantic, high-priority fallback. The optional 3.73 MB loop is mounted only when the hero is near the viewport and the browser reports all of the following: a viewport wider than 700 px, no reduced-motion preference, no Save-Data preference, no 2G-class connection and no known device-memory value below 4 GB. The video uses `preload="none"`; playback or media errors remove it and retain the approved poster, with a status message for assistive technology. All essential content and calls to action work without video or JavaScript motion.
+
+Route changes update the document title, description, canonical URL, Open Graph basics and JSON-LD. Product routes expose public Product/Offer schema only; no stock quantities, internal data or credentials are included. `robots.txt` and the public-route sitemap are generated from `storefront/public/`. Client-side route metadata improves browser and social context, while full server-rendered per-product metadata remains a future option if the storefront moves to SSR.
+
+Global `:focus-visible` treatment, a skip link, route-to-main focus, keyboard-operable controls and comprehensive reduced-motion overrides cover the storefront. Source and production text outputs are scanned as UTF-8 so typographic symbols do not regress into mojibake.
+
+### Measured mobile baseline (local production build, 5 November 2026)
+
+Lighthouse mobile is synthetic and varies by machine, so these results are a directional comparison rather than field Core Web Vitals. The before run targeted the stable production URL; the after run targeted the local production build on the same machine. The local API is intentionally unavailable during the after run, which creates one console/network error and limits Best Practices to 96.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Performance | 68 | 91 |
+| Accessibility | 95 | 100 |
+| Best Practices | 100 | 96 (local API error) |
+| SEO | 92 | 100 |
+| FCP | 2.9 s | 2.5 s |
+| LCP | 6.8 s | 2.8 s |
+| Total blocking time | 110 ms | 50 ms |
+| CLS | 0.02 | 0.02 |
+| Speed Index | 4.6 s | 3.6 s |
+| Hero video transfer in mobile trace | 3,733,208 bytes | 0 bytes |
+
+The customer bundle remains 175.69 kB JavaScript / 55.79 kB gzip and 19.15 kB CSS / 4.81 kB gzip. No runtime dependency was added. Baseline and after reports are retained locally as untracked `.lighthouse-before.json` and `.lighthouse-after.json` measurement artifacts.
